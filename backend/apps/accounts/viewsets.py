@@ -31,7 +31,10 @@ class TenantWritePermission(BasePermission):
             return True
         if user.is_staff:
             return True
-        return user.role in getattr(view, "write_roles", STAFF_WRITE_ROLES)
+        if user.role in getattr(view, "write_roles", STAFF_WRITE_ROLES):
+            return True
+        checker = getattr(view, "student_may_write", None)
+        return bool(checker and checker(request))
 
 
 class TenantModelViewSet(viewsets.ModelViewSet):
@@ -68,6 +71,18 @@ class TenantModelViewSet(viewsets.ModelViewSet):
         if value is None:
             return queryset.none()
         return queryset.filter(**{field: value})
+
+    def get_student_profile(self):
+        """Return the student linked to the authenticated user (or raise)."""
+
+        from apps.campus.models import Student
+
+        student = Student.objects.select_related("section").filter(
+            user=self.request.user
+        ).first()
+        if student is None:
+            raise PermissionDenied("No student profile is linked to this account.")
+        return student
 
     def get_serializer(self, *args, **kwargs):
         serializer = super().get_serializer(*args, **kwargs)

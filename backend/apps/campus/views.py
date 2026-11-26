@@ -1,5 +1,5 @@
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from apps.accounts.tenancy import TENANT_LOOKUPS, scope_queryset, tenant_id_for
+from apps.accounts.viewsets import TenantModelViewSet
 from apps.accounts.viewsets import TenantModelViewSet
 
 from .models import (
@@ -294,6 +295,72 @@ class StudentPortalView(APIView):
             section=student.section, date__gte=timezone.localdate()
         ).select_related("subject", "room").order_by("date", "start_period") if student.section_id else ExamSchedule.objects.none()
 
+        from apps.assignments.models import Assignment, Submission
+        from apps.placements.models import JobPosting, PlacementApplication
+
+        assignment_rows = Assignment.objects.filter(
+            college=student.user.college, section=student.section
+        ).select_related("subject", "faculty__user").order_by("-due_at") if student.section_id else Assignment.objects.none()
+        submissions_by_assignment = {
+            row.assignment_id: row
+            for row in Submission.objects.filter(student=student)
+        }
+        assignments_payload = [
+            {
+                "id": row.id,
+                "title": row.title,
+                "description": row.description,
+                "subject": row.subject.name,
+                "subject_code": row.subject.code,
+                "faculty": row.faculty.user.get_full_name() or row.faculty.user.username,
+                "due_at": row.due_at,
+                "max_marks": row.max_marks,
+                "submission": (
+                    {
+                        "id": submission.id,
+                        "submitted_at": submission.submitted_at,
+                        "marks": submission.marks,
+                        "feedback": submission.feedback,
+                    }
+                    if (submission := submissions_by_assignment.get(row.id))
+                    else None
+                ),
+            }
+            for row in assignment_rows
+        ]
+
+        job_rows = JobPosting.objects.filter(
+            company__college=student.user.college, is_active=True
+        ).filter(
+            Q(deadline__isnull=True) | Q(deadline__gte=timezone.localdate())
+        ).select_related("company").order_by("-created_at")
+        applications_by_job = {
+            row.job_id: row
+            for row in PlacementApplication.objects.filter(student=student)
+        }
+        jobs_payload = [
+            {
+                "id": row.id,
+                "title": row.title,
+                "company": row.company.name,
+                "description": row.description,
+                "eligibility": row.eligibility,
+                "package": row.package,
+                "deadline": row.deadline,
+                "application": (
+                    {
+                        "id": application.id,
+                        "status": application.status,
+                        "applied_on": application.applied_on,
+                        "remarks": application.remarks,
+                    }
+                    if (application := applications_by_job.get(row.id))
+                    else None
+                ),
+            }
+            for row in job_rows
+        ]
+
         return Response({
             "student": {
                 "student_id": student.student_id,
@@ -323,6 +390,8 @@ class StudentPortalView(APIView):
             } for assignment in assignments],
             "timetable": TimetableEntrySerializer(timetable, many=True).data,
             "exams": ExamScheduleSerializer(exams, many=True).data,
+            "assignments": assignments_payload,
+            "jobs": jobs_payload,
         })
 
 

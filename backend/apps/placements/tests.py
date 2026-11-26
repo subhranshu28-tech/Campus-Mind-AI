@@ -108,3 +108,113 @@ class PlacementApplicationApiTests(ERPAPITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual([row["id"] for row in response.data["results"]], [mine.id])
+
+
+class StudentPlacementApplicationApiTests(ERPAPITestCase):
+    def setUp(self):
+        super().setUp()
+        self.company = Company.objects.create(college=self.college, name="Acme")
+        self.job = JobPosting.objects.create(
+            company=self.company, title="Engineer", is_active=True
+        )
+        self.inactive_job = JobPosting.objects.create(
+            company=self.company, title="Closed role", is_active=False
+        )
+
+    def test_student_can_apply_to_an_active_job(self):
+        self.as_student()
+
+        response = self.client.post(
+            "/api/placement-applications/",
+            {"job": self.job.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        application = PlacementApplication.objects.get(pk=response.data["id"])
+        self.assertEqual(application.student, self.campus.student)
+        self.assertEqual(application.status, "applied")
+
+    def test_student_cannot_apply_to_an_inactive_job(self):
+        self.as_student()
+
+        response = self.client.post(
+            "/api/placement-applications/",
+            {"job": self.inactive_job.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(PlacementApplication.objects.exists())
+
+    def test_student_cannot_apply_twice(self):
+        PlacementApplication.objects.create(job=self.job, student=self.campus.student)
+        self.as_student()
+
+        response = self.client.post(
+            "/api/placement-applications/",
+            {"job": self.job.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+
+    def test_student_cannot_choose_their_own_status(self):
+        self.as_student()
+
+        response = self.client.post(
+            "/api/placement-applications/",
+            {"job": self.job.id, "status": "selected"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        application = PlacementApplication.objects.get(pk=response.data["id"])
+        self.assertEqual(application.status, "applied")
+
+    def test_student_cannot_update_or_delete_applications(self):
+        application = PlacementApplication.objects.create(
+            job=self.job, student=self.campus.student
+        )
+        self.as_student()
+
+        self.assertEqual(
+            self.client.patch(
+                f"/api/placement-applications/{application.id}/",
+                {"remarks": "x"},
+                format="json",
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.delete(
+                f"/api/placement-applications/{application.id}/"
+            ).status_code,
+            403,
+        )
+
+    def test_student_only_sees_active_jobs(self):
+        self.as_student()
+
+        response = self.client.get("/api/job-postings/")
+
+        self.assertEqual(response.status_code, 200)
+        ids = [row["id"] for row in response.data["results"]]
+        self.assertIn(self.job.id, ids)
+        self.assertNotIn(self.inactive_job.id, ids)
+
+    def test_staff_can_update_an_application_status(self):
+        application = PlacementApplication.objects.create(
+            job=self.job, student=self.campus.student
+        )
+
+        response = self.client.patch(
+            f"/api/placement-applications/{application.id}/",
+            {"status": "shortlisted", "remarks": "Strong candidate"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        application.refresh_from_db()
+        self.assertEqual(application.status, "shortlisted")
+        self.assertEqual(application.remarks, "Strong candidate")

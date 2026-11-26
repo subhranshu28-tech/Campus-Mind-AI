@@ -170,3 +170,117 @@ class SubmissionApiTests(ERPAPITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual([row["id"] for row in response.data["results"]], [mine.id])
+
+
+class StudentSubmissionApiTests(ERPAPITestCase):
+    def setUp(self):
+        super().setUp()
+        self.assignment = Assignment.objects.create(
+            college=self.college,
+            title="Lab record",
+            subject=self.campus.subject,
+            section=self.campus.section,
+            faculty=self.campus.faculty,
+            due_at="2026-12-01T10:00:00Z",
+        )
+
+    def test_student_can_submit_for_their_own_assignment(self):
+        self.as_student()
+
+        response = self.client.post(
+            "/api/submissions/",
+            {"assignment": self.assignment.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        submission = Submission.objects.get(pk=response.data["id"])
+        self.assertEqual(submission.student, self.campus.student)
+        self.assertIsNone(submission.marks)
+
+    def test_student_cannot_submit_for_another_section(self):
+        other_section = Section.objects.create(
+            semester=self.campus.semester, name="OTHER", capacity=30
+        )
+        other_assignment = Assignment.objects.create(
+            college=self.college,
+            title="Other section homework",
+            subject=self.campus.subject,
+            section=other_section,
+            faculty=self.campus.faculty,
+            due_at="2026-12-02T10:00:00Z",
+        )
+        self.as_student()
+
+        response = self.client.post(
+            "/api/submissions/",
+            {"assignment": other_assignment.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(Submission.objects.exists())
+
+    def test_student_cannot_submit_twice(self):
+        Submission.objects.create(assignment=self.assignment, student=self.campus.student)
+        self.as_student()
+
+        response = self.client.post(
+            "/api/submissions/",
+            {"assignment": self.assignment.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
+
+    def test_student_cannot_grade_their_own_submission(self):
+        self.as_student()
+
+        response = self.client.post(
+            "/api/submissions/",
+            {
+                "assignment": self.assignment.id,
+                "marks": 100,
+                "feedback": "self grade",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        submission = Submission.objects.get(pk=response.data["id"])
+        self.assertIsNone(submission.marks)
+        self.assertEqual(submission.feedback, "")
+
+    def test_student_cannot_update_or_delete_submissions(self):
+        submission = Submission.objects.create(
+            assignment=self.assignment, student=self.campus.student
+        )
+        self.as_student()
+
+        self.assertEqual(
+            self.client.patch(
+                f"/api/submissions/{submission.id}/",
+                {"feedback": "x"},
+                format="json",
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/submissions/{submission.id}/").status_code, 403
+        )
+
+    def test_staff_can_grade_a_submission(self):
+        submission = Submission.objects.create(
+            assignment=self.assignment, student=self.campus.student
+        )
+
+        response = self.client.patch(
+            f"/api/submissions/{submission.id}/",
+            {"marks": 85, "feedback": "Good work"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        submission.refresh_from_db()
+        self.assertEqual(submission.marks, 85)
+        self.assertEqual(submission.feedback, "Good work")

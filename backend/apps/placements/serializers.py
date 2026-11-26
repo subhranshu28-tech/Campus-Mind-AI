@@ -23,3 +23,12 @@ class PlacementApplicationSerializer(serializers.ModelSerializer):
         model = PlacementApplication
         fields = "__all__"
         read_only_fields = ("applied_on",)
+
+
+class StudentPlacementApplicationSerializer(serializers.ModelSerializer):
+    """Self-service serializer: students cannot choose their own status."""
+
+    class Meta:
+        model = PlacementApplication
+        fields = ("id", "job", "status", "applied_on", "remarks")
+        read_only_fields = ("id", "status", "applied_on")
