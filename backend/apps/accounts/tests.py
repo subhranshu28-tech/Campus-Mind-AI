@@ -2,6 +2,8 @@ import tempfile
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.signals import request_finished
+from django.db import close_old_connections
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -328,7 +330,14 @@ class CampusApiTests(TestCase):
         download = self.client.get(f"/api/subject-notes/{note_id}/download/")
         self.assertEqual(download.status_code, 200)
         self.assertEqual(download["Content-Type"], "application/pdf")
-        download.close()
+        # Closing a streaming FileResponse emits request_finished, which calls
+        # close_old_connections() and would drop the TestCase transaction on
+        # PostgreSQL. Keep the connection alive for the rest of the test.
+        request_finished.disconnect(close_old_connections)
+        try:
+            download.close()
+        finally:
+            request_finished.connect(close_old_connections)
 
         self.client.force_authenticate(other_student_user)
         self.assertEqual(self.client.get("/api/subject-notes/").data["results"], [])
