@@ -47,6 +47,11 @@ jobs:
       - name: Migration drift
         run: python manage.py makemigrations --check --dry-run
       - name: Tests with coverage
+        # Tests use plain HTTP; production settings force HTTPS redirects, so
+        # disable them for the test client only (check --deploy still runs with
+        # the secure production defaults above).
+        env:
+          DJANGO_SECURE_SSL_REDIRECT: "false"
         run: coverage run manage.py test apps && coverage report
 
   frontend:
