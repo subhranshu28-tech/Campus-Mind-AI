@@ -91,12 +91,12 @@ class CampusAccountSerializer(serializers.ModelSerializer):
 class DepartmentSerializer(TenantScopedUniqueNameMixin, serializers.ModelSerializer):
     head_name = serializers.CharField(source="head.get_full_name", read_only=True)
     student_count = serializers.IntegerField(read_only=True)
+    unique_name_fields = ("name", "code")
 
     class Meta:
         model = Department
         fields = ("id", "name", "code", "head", "head_name", "student_count", "is_active", "created_at")
         read_only_fields = ("created_at",)
-        unique_name_fields = ("name", "code")
 
     def validate_head(self, user):
         if user and user.role not in {"hod", "faculty"}:
@@ -187,13 +187,15 @@ class FacultySerializer(serializers.ModelSerializer):
 
 
 class AcademicYearSerializer(TenantScopedUniqueNameMixin, serializers.ModelSerializer):
+    unique_name_fields = ("name",)
+
     class Meta:
         model = AcademicYear
         fields = ("id", "name", "starts_on", "ends_on", "is_active", "created_at")
         read_only_fields = ("created_at",)
-        unique_name_fields = ("name",)
 
     def validate(self, attrs):
+        attrs = super().validate(attrs)
         starts_on = attrs.get("starts_on", getattr(self.instance, "starts_on", None))
         ends_on = attrs.get("ends_on", getattr(self.instance, "ends_on", None))
         if starts_on and ends_on and ends_on <= starts_on:
@@ -345,10 +347,11 @@ class PreviousYearQuestionPaperSerializer(SubjectNoteSerializer):
 
 
 class ClassroomSerializer(TenantScopedUniqueNameMixin, serializers.ModelSerializer):
+    unique_name_fields = ("code",)
+
     class Meta:
         model = Classroom
         fields = ("id", "name", "code", "capacity", "is_lab", "is_active")
-        unique_name_fields = ("code",)
 
     def validate_capacity(self, value):
         if value < 1:
