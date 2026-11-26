@@ -134,7 +134,9 @@ The product request covers a multi-module ERP and production deployment, which c
 
 Implemented in this pass: secure-by-default settings, JWT logout revocation, college-aware login, health/readiness probe, college-scoped audit logs with append-only admin, two-college regression tests, cache/throttle configuration, CI workflow, Ruff/coverage configuration, Docker/Compose stack, security/contribution docs, and frontend session/UX hardening.
 
-Not yet implemented: fees, library, hostel, transport, placements, assignments, notices and events as complete ERP workflows; fine-grained department-level object policies; an immutable audit trail for every data mutation (the audit log is append-only in Django admin but is not chain-sealed); a grounded academic assistant; frontend automated tests; configurable school-specific time periods; and production deployment verification. Multi-college tenant provisioning and application-level tenant scoping are implemented and covered by tests, but still require a staging migration rehearsal before public production use.
+Not yet implemented: fees, library, hostel, transport, placements, assignments, notices and events as complete ERP workflows; fine-grained department-level object policies; a grounded academic assistant; broad frontend component/integration tests beyond the current smoke tests; configurable school-specific time periods; and production deployment verification. Multi-college tenant provisioning and application-level tenant scoping are implemented and covered by tests, but still require a staging migration rehearsal before public production use.
+
+Implemented in this pass: tamper-evident audit-log hash chaining with per-college verification, CSP and hardening headers in the production nginx config, S3/CDN media URL support, frontend smoke tests (Vitest + React Testing Library), and a clean GitHub push of all changes.
 
 ## Problem statement coverage (intelligent academic scheduling)
 
@@ -152,7 +154,7 @@ UI: **Operations center** in the sidebar (analytics, leave and substitutes, exam
 Demo data: `python manage.py seed_demo` builds a small college with a deterministic, conflict-free timetable that does not require OR-Tools (accounts use a random password printed once, or pass `--password`).
 
 ### Current operating limits
-Multi-college workspaces are implemented with application-level tenant scoping; staging migration and cross-tenant verification are still required before public production use. Scheduling currently uses Monday-Friday with eight periods and exam sessions fixed at P1-3 / P5-7. Notifications are in-app only (no email/SMS), and frontend automated tests are not yet included. The OR-Tools solver is large and long-running: on Vercel it may exceed function size/time limits, so host the API on Render/Railway/Fly (or move the solver to a background worker) and keep Vercel for the React frontend; use hosted PostgreSQL and persistent object storage for uploaded files.
+Multi-college workspaces are implemented with application-level tenant scoping; staging migration and cross-tenant verification are still required before public production use. Scheduling currently uses Monday-Friday with eight periods and exam sessions fixed at P1-3 / P5-7. Notifications are in-app only (no email/SMS). Frontend coverage is currently limited to smoke tests; broader component and integration tests are still needed. The OR-Tools solver is large and long-running: on Vercel it may exceed function size/time limits, so host the API on Render/Railway/Fly (or move the solver to a background worker) and keep Vercel for the React frontend; use hosted PostgreSQL and persistent object storage for uploaded files.
 
 ## Configuration and security notes
 
