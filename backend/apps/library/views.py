@@ -1,21 +1,15 @@
-from rest_framework import viewsets
+from apps.accounts.viewsets import TenantModelViewSet
 
-from apps.accounts.tenancy import scope_queryset
 from .models import Book, BookIssue
 from .serializers import BookIssueSerializer, BookSerializer
 
 
-class BookViewSet(viewsets.ModelViewSet):
+class BookViewSet(TenantModelViewSet):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
 
-    def get_queryset(self):
-        return scope_queryset(self.queryset, self.request.user)
 
-
-class BookIssueViewSet(viewsets.ModelViewSet):
-    queryset = BookIssue.objects.all()
+class BookIssueViewSet(TenantModelViewSet):
+    queryset = BookIssue.objects.select_related("book", "student")
     serializer_class = BookIssueSerializer
-
-    def get_queryset(self):
-        return scope_queryset(self.queryset, self.request.user)
+    student_scope_field = "student_id"

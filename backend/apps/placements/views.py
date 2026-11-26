@@ -1,29 +1,24 @@
-from rest_framework import viewsets
+from apps.accounts.viewsets import TenantModelViewSet
 
-from apps.accounts.tenancy import scope_queryset
 from .models import Company, JobPosting, PlacementApplication
-from .serializers import CompanySerializer, JobPostingSerializer, PlacementApplicationSerializer
+from .serializers import (
+    CompanySerializer,
+    JobPostingSerializer,
+    PlacementApplicationSerializer,
+)
 
 
-class CompanyViewSet(viewsets.ModelViewSet):
+class CompanyViewSet(TenantModelViewSet):
     queryset = Company.objects.all()
     serializer_class = CompanySerializer
 
-    def get_queryset(self):
-        return scope_queryset(self.queryset, self.request.user)
 
-
-class JobPostingViewSet(viewsets.ModelViewSet):
-    queryset = JobPosting.objects.all()
+class JobPostingViewSet(TenantModelViewSet):
+    queryset = JobPosting.objects.select_related("company")
     serializer_class = JobPostingSerializer
 
-    def get_queryset(self):
-        return scope_queryset(self.queryset, self.request.user)
 
-
-class PlacementApplicationViewSet(viewsets.ModelViewSet):
-    queryset = PlacementApplication.objects.all()
+class PlacementApplicationViewSet(TenantModelViewSet):
+    queryset = PlacementApplication.objects.select_related("job", "student")
     serializer_class = PlacementApplicationSerializer
-
-    def get_queryset(self):
-        return scope_queryset(self.queryset, self.request.user)
+    student_scope_field = "student_id"

@@ -1,6 +1,5 @@
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Sum
-from django.db.models.deletion import ProtectedError
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -12,6 +11,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from apps.accounts.tenancy import TENANT_LOOKUPS, scope_queryset, tenant_id_for
+from apps.accounts.viewsets import TenantModelViewSet
 
 from .models import (
     AcademicYear,
@@ -69,52 +69,8 @@ from .timetable_optimizer import (
 from .jobs import enqueue_timetable_job
 
 
-class CampusModelViewSet(viewsets.ModelViewSet):
-    def get_queryset(self):
-        return scope_queryset(super().get_queryset(), self.request.user)
-
+class CampusModelViewSet(TenantModelViewSet):
     permission_classes = [IsAuthenticated, CampusStaffCanManage]
-
-    def get_serializer(self, *args, **kwargs):
-        serializer = super().get_serializer(*args, **kwargs)
-        college_id = getattr(self.request.user, "college_id", None)
-        fields = serializer.child.fields if isinstance(serializer, serializers.ListSerializer) else serializer.fields
-        for field in fields.values():
-            queryset = getattr(field, "queryset", None)
-            if queryset is not None and college_id:
-                related_model = queryset.model
-                if related_model.__name__ == "User":
-                    field.queryset = queryset.filter(college_id=college_id)
-                else:
-                    lookup = TENANT_LOOKUPS.get(related_model.__name__)
-                    if lookup:
-                        field.queryset = queryset.filter(**{lookup: college_id})
-        return serializer
-
-    def perform_create(self, serializer):
-        college_id = getattr(self.request.user, "college_id", None)
-        for value in serializer.validated_data.values():
-            if hasattr(value, "_meta") and tenant_id_for(value) != college_id:
-                raise ValidationError({"detail": "Related records must belong to your college."})
-        save_kwargs = {}
-        if any(field.name == "college" for field in serializer.Meta.model._meta.fields):
-            save_kwargs["college_id"] = college_id
-        serializer.save(**save_kwargs)
-
-    def perform_update(self, serializer):
-        college_id = getattr(self.request.user, "college_id", None)
-        for value in serializer.validated_data.values():
-            if hasattr(value, "_meta") and tenant_id_for(value) != college_id:
-                raise ValidationError({"detail": "Related records must belong to your college."})
-        serializer.save()
-
-    def perform_destroy(self, instance):
-        try:
-            instance.delete()
-        except ProtectedError as error:
-            raise ValidationError(
-                {"detail": "This record is still referenced by other campus records and cannot be deleted."}
-            ) from error
 
 
 class DepartmentViewSet(CampusModelViewSet):

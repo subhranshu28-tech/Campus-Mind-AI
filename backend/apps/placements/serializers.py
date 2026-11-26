@@ -1,12 +1,15 @@
 from rest_framework import serializers
 
+from apps.accounts.serializers import TenantScopedUniqueNameMixin
+
 from .models import Company, JobPosting, PlacementApplication
 
 
-class CompanySerializer(serializers.ModelSerializer):
+class CompanySerializer(TenantScopedUniqueNameMixin, serializers.ModelSerializer):
     class Meta:
         model = Company
         fields = "__all__"
+        read_only_fields = ("college",)
 
 
 class JobPostingSerializer(serializers.ModelSerializer):

@@ -214,7 +214,7 @@ The timetable model is **Monday–Friday, eight periods per day**; exam sessions
 ## Testing
 
 ```bash
-# Backend — full suite (65 tests)
+# Backend — full suite (123 tests)
 python manage.py test apps
 
 # Frontend — unit/component tests (23 tests)
@@ -225,7 +225,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-Backend coverage includes authentication and token revocation, tenant isolation, audit-chain verification, academic and attendance workflows, OR-Tools scheduling, asynchronous job lifecycle, substitutions, exam planning, analytics/export, notices, and tenant-scoped staff/student access rules. Frontend tests cover the API auth/refresh interceptors, login, the notification bell, module CRUD flows, pagination, and the error boundary.
+Backend coverage includes authentication and token revocation, tenant isolation, audit-chain verification, academic and attendance workflows, OR-Tools scheduling, asynchronous job lifecycle, substitutions, exam planning, analytics/export, notices, and every ERP module (assignments, fees, library, hostel, transport, placements) including cross-tenant write rejection and student row scoping. Frontend tests cover the API auth/refresh interceptors, login, the notification bell, module CRUD flows, pagination, and the error boundary.
 
 CI runs on every push and pull request: critical lint, `check --deploy`, migration drift, the full backend suite with coverage, frontend tests, a production build, and `npm audit`.
 

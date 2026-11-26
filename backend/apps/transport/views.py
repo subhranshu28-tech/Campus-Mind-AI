@@ -1,29 +1,22 @@
-from rest_framework import viewsets
+from apps.accounts.viewsets import TenantModelViewSet
 
-from apps.accounts.tenancy import scope_queryset
 from .models import StudentTransport, TransportRoute, Vehicle
 from .serializers import StudentTransportSerializer, TransportRouteSerializer, VehicleSerializer
 
 
-class TransportRouteViewSet(viewsets.ModelViewSet):
+class TransportRouteViewSet(TenantModelViewSet):
     queryset = TransportRoute.objects.all()
     serializer_class = TransportRouteSerializer
 
-    def get_queryset(self):
-        return scope_queryset(self.queryset, self.request.user)
 
-
-class VehicleViewSet(viewsets.ModelViewSet):
-    queryset = Vehicle.objects.all()
+class VehicleViewSet(TenantModelViewSet):
+    queryset = Vehicle.objects.select_related("route").order_by("registration_number")
     serializer_class = VehicleSerializer
 
-    def get_queryset(self):
-        return scope_queryset(self.queryset, self.request.user)
 
-
-class StudentTransportViewSet(viewsets.ModelViewSet):
-    queryset = StudentTransport.objects.all()
+class StudentTransportViewSet(TenantModelViewSet):
+    queryset = StudentTransport.objects.select_related("student", "route").order_by(
+        "-allocated_on", "-id"
+    )
     serializer_class = StudentTransportSerializer
-
-    def get_queryset(self):
-        return scope_queryset(self.queryset, self.request.user)
+    student_scope_field = "student_id"
