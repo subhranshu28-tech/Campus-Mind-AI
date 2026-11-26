@@ -137,11 +137,16 @@ class DispatchedTimetableJobTests(TestCase):
         )
         cls.semester = Semester.objects.first()
 
+    @override_settings(
+        TIMETABLE_ASYNC_EAGER=False,
+        CELERY_TASK_ALWAYS_EAGER=False,
+        CELERY_BROKER_URL="memory://",
+    )
     def test_non_eager_request_queues_and_starts_worker(self):
         client = APIClient()
         client.force_authenticate(self.admin)
 
-        with patch("apps.campus.jobs.threading.Thread") as thread_class:
+        with patch("apps.campus.jobs.run_timetable_job_task") as task:
             with self.captureOnCommitCallbacks(execute=True):
                 response = client.post(
                     "/api/timetable/generate/async/",
@@ -153,8 +158,7 @@ class DispatchedTimetableJobTests(TestCase):
         self.assertEqual(response.data["status"], "queued")
         job = TimetableJob.objects.get(pk=response.data["id"])
         self.assertEqual(job.status, "queued")
-        thread_class.assert_called_once()
-        thread_class.return_value.start.assert_called_once()
+        task.delay.assert_called_once()
 
     def test_worker_records_failure_for_missing_assignments(self):
         from apps.campus.jobs import run_timetable_job

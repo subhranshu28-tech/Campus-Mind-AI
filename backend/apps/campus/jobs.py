@@ -1,17 +1,17 @@
 """Background execution for expensive timetable optimisation runs.
 
 The OR-Tools solver can block for seconds or minutes on real college data. This
-module queues a :class:`~apps.campus.models.TimetableJob` and runs the solver
-on a daemon thread so the HTTP request returns immediately with a job id that
-the UI can poll.
+module queues a :class:`~apps.campus.models.TimetableJob` and runs the solver on
+a Celery worker so the HTTP request returns immediately with a job id that the
+UI can poll.
 
-For deployments that need durable queues, set ``TIMETABLE_ASYNC_EAGER=false``
-and swap :func:`_start_worker` for a Celery/RQ task; the job model and the
-``run_timetable_job`` entry point stay the same.
+With ``TIMETABLE_ASYNC_EAGER`` enabled (tests, tiny installs) or no broker
+configured, the solve runs inline so callers observe the final state. The job
+model and the :func:`run_timetable_job` entry point stay the same, so callers
+and tests do not need to know which backend is in use.
 """
 
-import threading
-
+from celery import shared_task
 from django.conf import settings
 from django.db import close_old_connections, transaction
 from django.utils import timezone
@@ -20,46 +20,35 @@ from .models import TimetableEntry, TimetableJob
 from .timetable_optimizer import TimetableOptimizationError, generate_timetable
 
 
-def enqueue_timetable_job(semester, user):
-    """Create a job for ``semester`` and start it.
+@shared_task(name="campus.run_timetable_job")
+def run_timetable_job_task(self, job_id):
+    """Celery entry point: own the worker process DB connection lifecycle."""
 
-    With ``TIMETABLE_ASYNC_EAGER`` enabled (tests, tiny installs) the solve runs
-    inline so callers observe the final state. Otherwise it is handed to a
-    background thread once the creating transaction commits.
-    """
+    close_old_connections()
+    try:
+        return run_timetable_job(job_id)
+    finally:
+        close_old_connections()
+
+
+def enqueue_timetable_job(semester, user):
+    """Create a job for ``semester`` and start it."""
 
     job = TimetableJob.objects.create(
         college_id=user.college_id,
         semester=semester,
         created_by=user,
     )
-    if getattr(settings, "TIMETABLE_ASYNC_EAGER", False):
+    if getattr(settings, "TIMETABLE_ASYNC_EAGER", False) or getattr(
+        settings, "CELERY_TASK_ALWAYS_EAGER", False
+    ):
         run_timetable_job(job.pk)
         job.refresh_from_db()
     else:
-        transaction.on_commit(lambda: _start_worker(job.pk))
+        transaction.on_commit(
+            lambda: run_timetable_job_task.delay(job.pk)
+        )
     return job
-
-
-def _start_worker(job_id):
-    worker = threading.Thread(
-        target=_worker_entry,
-        args=(job_id,),
-        name=f"timetable-job-{job_id}",
-        daemon=True,
-    )
-    worker.start()
-    return worker
-
-
-def _worker_entry(job_id):
-    """Thread entry point: own the thread-local DB connection lifecycle."""
-
-    close_old_connections()
-    try:
-        run_timetable_job(job_id)
-    finally:
-        close_old_connections()
 
 
 def run_timetable_job(job_id):

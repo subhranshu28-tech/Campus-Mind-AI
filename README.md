@@ -93,6 +93,7 @@ flowchart LR
 | --- | --- |
 | Backend | Django 5.1, Django REST Framework, SimpleJWT |
 | Optimisation | Google OR-Tools CP-SAT |
+| Background jobs | Celery (Redis broker; inline fallback) |
 | Database | PostgreSQL (SQLite for local development) |
 | Cache / throttling | Redis (optional; in-memory fallback) |
 | Frontend | React 18, Vite, Tailwind CSS, React Router, Recharts, Lucide |
@@ -307,7 +308,7 @@ Campus-Mind-AI/
 - ✅ Multi-college tenancy, audit hash chain, email notices, background timetable jobs.
 - ✅ Green CI with backend and frontend tests.
 - ⏳ Live deployment verification (Render/Vercel credentials required).
-- ⏳ Durable job queue (Celery/RQ) for multi-worker deployments.
+- ✅ Durable job queue (Celery/RQ) for multi-worker deployments.
 - ⏳ Fine-grained department-level object policies.
 - ⏳ Configurable school-specific period structures (currently Mon–Fri, 8 periods).
 

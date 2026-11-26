@@ -65,6 +65,27 @@ services:
     ports:
       - "8080:80"
 
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["sh", "-c", "cd backend && celery -A config worker -l info"]
+    env_file:
+      - .env
+    environment:
+      DJANGO_DEBUG: "false"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,api"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - media_data:/app/backend/media
+
 volumes:
   postgres_data:
   redis_data:

@@ -161,6 +161,18 @@ if REDIS_URL:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}}
 else:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "campusmind-local"}}
+
+# Durable background task queue (Celery). When REDIS_URL is set, jobs are
+# dispatched to a Celery worker; otherwise they run inline so the app works
+# without a broker. TIMETABLE_ASYNC_EAGER=true also forces inline execution.
+CELERY_BROKER_URL = REDIS_URL or "memory://"
+CELERY_RESULT_BACKEND = REDIS_URL or None
+CELERY_TASK_ALWAYS_EAGER = env_bool("TIMETABLE_ASYNC_EAGER", not bool(REDIS_URL))
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
 SESSION_COOKIE_SECURE = not DEBUG
