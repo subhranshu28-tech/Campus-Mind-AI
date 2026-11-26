@@ -8,6 +8,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from apps.accounts.models import College
 from apps.campus.models import (
     Classroom, ExamSchedule, Faculty, FacultyAvailability, Student, Subject,
     TeachingAssignment, TimetableEntry,
@@ -191,8 +192,11 @@ def assign_manual(leave, entry_id, day, faculty, actor):
 # ------------------------------------------------------------------ timetable move with live conflict check
 def check_move(entry, weekday, period, room):
     problems = []
-    if not 0 <= weekday <= 4 or not 1 <= period <= 8:
-        return ["Choose a weekday between Monday and Friday and a period between 1 and 8."]
+    college = entry.section.semester.course.department.college
+    weekdays = college.schedule_weekdays
+    periods = college.schedule_periods
+    if not 0 <= weekday < weekdays or not 1 <= period <= periods:
+        return [f"Choose a weekday within the configured schedule and a period between 1 and {periods}."]
     slot = TimetableEntry.objects.filter(weekday=weekday, period=period).exclude(pk=entry.pk)
     if slot.filter(section=entry.section).exists():
         problems.append("The section already has a class in this period.")
@@ -217,7 +221,14 @@ def _faculty_slots(faculty_id):
     blocked = {(r.weekday, r.period) for r in records if not r.is_available}
     if explicit:
         return explicit - blocked
-    return {(d, p) for d in range(5) for p in range(1, 9)} - blocked
+    try:
+        faculty = Faculty.objects.select_related("department__college").get(pk=faculty_id)
+        college = faculty.department.college
+        weekdays = college.schedule_weekdays
+        periods = college.schedule_periods
+    except Faculty.DoesNotExist:
+        weekdays, periods = 5, 8
+    return {(d, p) for d in range(weekdays) for p in range(1, periods + 1)} - blocked
 
 
 @transaction.atomic
@@ -321,6 +332,12 @@ def auto_schedule_exams(semester, start, end, holidays, avoid_class_clashes, rep
     for row in FacultyAvailability.objects.filter(faculty__department__college_id=college_id):
         key = "allowed" if row.is_available else "blocked"
         availability[row.faculty_id][key].add((row.weekday, row.period))
+    college_periods = (
+        College.objects.filter(pk=college_id)
+        .values_list("schedule_periods", flat=True)
+        .first()
+        or 8
+    )
     for day in dates:
         weekday = day.weekday()
         for index, session in enumerate(EXAM_SESSIONS):
@@ -333,7 +350,9 @@ def auto_schedule_exams(semester, start, end, holidays, avoid_class_clashes, rep
                     usable = {p for (w, p) in slots["allowed"] if w == weekday}
                     usable -= {p for (w, p) in slots["blocked"] if w == weekday}
                 else:
-                    usable = set(range(1, 9)) - {p for (w, p) in slots["blocked"] if w == weekday}
+                    usable = set(range(1, college_periods + 1)) - {
+                        p for (w, p) in slots["blocked"] if w == weekday
+                    }
                 if not required.issubset(usable):
                     busy_faculty.add((person["id"], day, index))
     invigilators = engine.assign_invigilators(
@@ -386,19 +405,22 @@ def analytics(semester=None, weekly_limit=18, daily_limit=5, college_id=None):
     entries_qs = TimetableEntry.objects.filter(section__semester__course__department__college_id=college_id)
     if semester:
         entries_qs = entries_qs.filter(section__semester=semester)
+    college = College.objects.filter(pk=college_id).first()
+    days = college.schedule_weekdays if college else 5
+    periods = college.schedule_periods if college else 8
     entries = list(entries_qs.values("room_id", "faculty_id", "section_id", "weekday", "period"))
     rooms = [{"id": r.id, "code": r.code, "name": r.name, "capacity": r.capacity, "is_lab": r.is_lab}
              for r in Classroom.objects.filter(college_id=college_id, is_active=True)]
     faculty = [{"id": f.id, "name": _name(f)} for f in Faculty.objects.filter(department__college_id=college_id).select_related("user")]
-    utilization = engine.room_utilization(rooms, entries)
+    utilization = engine.room_utilization(rooms, entries, days=days, periods=periods)
     load = engine.faculty_load(faculty, entries, weekly_limit, daily_limit)
-    heat = engine.demand_heatmap(len(rooms), entries)
+    heat = engine.demand_heatmap(len(rooms), entries, days=days, periods=periods)
     conflicts = engine.detect_conflicts(entries)
     today = timezone.localdate()
     pending = FacultyLeave.objects.filter(faculty__department__college_id=college_id, status="pending").count()
     covered = Substitution.objects.filter(section__semester__course__department__college_id=college_id, status="assigned", date__gte=today).count()
     unresolved = _unresolved_count(college_id)
-    total_slots = len(rooms) * 40
+    total_slots = len(rooms) * days * periods
     used = len(entries)
     return {
         "summary": {
@@ -410,7 +432,7 @@ def analytics(semester=None, weekly_limit=18, daily_limit=5, college_id=None):
             "exams_scheduled": ExamSchedule.objects.filter(section__semester__course__department__college_id=college_id).count(),
         },
         "rooms": utilization, "faculty": load[:15], "heatmap": heat,
-        "days": engine.DAY_NAMES, "conflicts": conflicts,
+        "days": engine.DAY_NAMES[:days], "conflicts": conflicts,
         "insights": engine.build_insights(utilization, load, heat, conflicts, unresolved),
     }
 
@@ -438,21 +460,44 @@ def timetable_workbook(scope, object_id):
                  "faculty": f"{entry.subject.code}\n{entry.section}\n{entry.room.code}",
                  "room": f"{entry.subject.code}\n{entry.section}\n{_name(entry.faculty)}"}[scope]
         grid[(entry.weekday, entry.period)].append(label)
+    weekdays = 5
+    periods = 8
+    college = None
+    if scope == "section":
+        from apps.campus.models import Section
+
+        section = Section.objects.select_related("semester__course__department__college").filter(pk=object_id).first()
+        college = section.semester.course.department.college if section else None
+    elif scope == "faculty":
+        from apps.campus.models import Faculty
+
+        faculty = Faculty.objects.select_related("department__college").filter(pk=object_id).first()
+        college = faculty.department.college if faculty else None
+    elif scope == "room":
+        from apps.campus.models import Classroom
+
+        room = Classroom.objects.filter(pk=object_id).first()
+        college = room.college if room else None
+    if college is not None:
+        weekdays = college.schedule_weekdays
+        periods = college.schedule_periods
+
     book = Workbook()
     sheet = book.active
     sheet.title = "Timetable"
-    sheet.append(["Period"] + engine.DAY_NAMES)
+    sheet.append(["Period"] + engine.DAY_NAMES[:weekdays])
     for cell in sheet[1]:
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="1D4ED8")
         cell.alignment = Alignment(horizontal="center")
-    for period in range(1, 9):
-        sheet.append([f"P{period}"] + ["\n---\n".join(grid.get((day, period), [])) or "-" for day in range(5)])
+    for period in range(1, periods + 1):
+        sheet.append([f"P{period}"] + ["\n---\n".join(grid.get((day, period), [])) or "-" for day in range(weekdays)])
         sheet.row_dimensions[period + 1].height = 62
         for cell in sheet[period + 1]:
             cell.alignment = Alignment(wrap_text=True, vertical="center", horizontal="center")
     sheet.column_dimensions["A"].width = 9
-    for column in "BCDEF":
+    for index in range(weekdays):
+        column = chr(ord("B") + index)
         sheet.column_dimensions[column].width = 24
     buffer = BytesIO()
     book.save(buffer)

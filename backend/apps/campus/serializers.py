@@ -390,10 +390,19 @@ class FacultyAvailabilitySerializer(serializers.ModelSerializer):
         faculty = attrs.get("faculty", getattr(self.instance, "faculty", None))
         weekday = attrs.get("weekday", getattr(self.instance, "weekday", None))
         period = attrs.get("period", getattr(self.instance, "period", None))
-        if weekday is not None and not 0 <= weekday <= 4:
-            raise serializers.ValidationError({"weekday": "Choose a weekday from Monday through Friday."})
-        if period is not None and not 1 <= period <= 8:
-            raise serializers.ValidationError({"period": "Choose a period between 1 and 8."})
+        college = None
+        if faculty is not None:
+            college = getattr(getattr(faculty, "department", None), "college", None)
+        weekdays = getattr(college, "schedule_weekdays", 5) if college else 5
+        periods = getattr(college, "schedule_periods", 8) if college else 8
+        if weekday is not None and not (0 <= weekday < weekdays):
+            raise serializers.ValidationError(
+                {"weekday": f"Choose a weekday within the configured schedule (0–{weekdays - 1})."}
+            )
+        if period is not None and not (1 <= period <= periods):
+            raise serializers.ValidationError(
+                {"period": f"Choose a period between 1 and {periods}."}
+            )
         if faculty and weekday is not None and period is not None:
             duplicates = FacultyAvailability.objects.filter(
                 faculty=faculty, weekday=weekday, period=period
@@ -461,8 +470,19 @@ class ExamScheduleSerializer(serializers.ModelSerializer):
                 errors["room"] = "Room capacity is below the section capacity."
             if subject and subject.is_lab and not room.is_lab:
                 errors["room"] = "A laboratory subject requires a laboratory room."
-        if start is not None and duration is not None and start + duration - 1 > 8:
+        periods_per_day = (
+            section.semester.course.department.college.schedule_periods
+            if section
+            else 8
+        )
+        if start is not None and duration is not None and start + duration - 1 > periods_per_day:
             errors["duration_periods"] = "The exam must finish within the academic day."
+        date_weekday = date.weekday() if date else None
+        college_weekdays = (
+            section.semester.course.department.college.schedule_weekdays
+            if section
+            else 5
+        )
         if date and start and duration and college_id:
             proposed_periods = set(range(start, start + duration))
             # Scope every conflict lookup to the section's college so another
@@ -486,7 +506,7 @@ class ExamScheduleSerializer(serializers.ModelSerializer):
                     break
             if not errors:
                 date_weekday = date.weekday()
-                if 0 <= date_weekday <= 4:
+                if date_weekday < college_weekdays:
                     timetable_conflicts = TimetableEntry.objects.filter(
                         weekday=date_weekday,
                         period__in=proposed_periods,
@@ -498,7 +518,7 @@ class ExamScheduleSerializer(serializers.ModelSerializer):
                     )
                     if timetable_conflicts.exists():
                         errors["start_period"] = "This exam overlaps an existing class timetable entry."
-                if not errors and invigilator and 0 <= date.weekday() <= 4:
+                if not errors and invigilator and date_weekday < college_weekdays:
                     availability = FacultyAvailability.objects.filter(faculty=invigilator)
                     explicit_available = set(
                         availability.filter(is_available=True).values_list("weekday", "period")

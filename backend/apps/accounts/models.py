@@ -9,10 +9,16 @@ class College(models.Model):
     code = models.CharField(max_length=24, unique=True)
     email = models.EmailField(blank=True)
     is_active = models.BooleanField(default=True)
+    schedule_weekdays = models.PositiveSmallIntegerField(default=5)
+    schedule_periods = models.PositiveSmallIntegerField(default=8)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(schedule_weekdays__gte=1, schedule_weekdays__lte=7), name="college_schedule_weekdays_valid"),
+            models.CheckConstraint(condition=models.Q(schedule_periods__gte=1, schedule_periods__lte=12), name="college_schedule_periods_valid"),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.slug:

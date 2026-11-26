@@ -127,10 +127,10 @@ const modules = {
   },
   "faculty-availability": {
     title: "Faculty availability", description: "Mark faculty available or unavailable for a weekday and class period. With no available slots marked, faculty are flexible except for blocked slots; once any slots are marked available, only those marked slots can be scheduled.",
-    endpoint: "faculty-availability", orderingField: "weekday", filters: [{ name: "faculty", label: "Faculty", endpoint: "faculty", optionLabel: "user_name" }, { name: "weekday", label: "Weekday", options: [["0", "Monday"], ["1", "Tuesday"], ["2", "Wednesday"], ["3", "Thursday"], ["4", "Friday"]] }, { name: "is_available", label: "Availability", options: [["true", "Available"], ["false", "Unavailable"]] }], columns: [["faculty_name", "Faculty"], ["weekday_name", "Weekday"], ["period", "Period"], ["is_available", "Available"]],
+    endpoint: "faculty-availability", orderingField: "weekday", filters: [{ name: "faculty", label: "Faculty", endpoint: "faculty", optionLabel: "user_name" }, { name: "weekday", label: "Weekday", options: [["0", "Monday"], ["1", "Tuesday"], ["2", "Wednesday"], ["3", "Thursday"], ["4", "Friday"], ["5", "Saturday"], ["6", "Sunday"]] }, { name: "is_available", label: "Availability", options: [["true", "Available"], ["false", "Unavailable"]] }], columns: [["faculty_name", "Faculty"], ["weekday_name", "Weekday"], ["period", "Period"], ["is_available", "Available"]],
     fields: [
       { name: "faculty", label: "Faculty", type: "select", endpoint: "faculty", optionLabel: "user_name", required: true, numeric: true },
-      { name: "weekday", label: "Weekday", type: "select", options: [[0, "Monday"], [1, "Tuesday"], [2, "Wednesday"], [3, "Thursday"], [4, "Friday"]], required: true, numeric: true },
+      { name: "weekday", label: "Weekday", type: "select", options: [[0, "Monday"], [1, "Tuesday"], [2, "Wednesday"], [3, "Thursday"], [4, "Friday"], [5, "Saturday"], [6, "Sunday"]], required: true, numeric: true },
       { name: "period", label: "Period", type: "select", options: Array.from({ length: 8 }, (_, index) => [index + 1, `Period ${index + 1}`]), required: true, numeric: true },
       { name: "is_available", label: "Available at this time", type: "checkbox" },
     ],

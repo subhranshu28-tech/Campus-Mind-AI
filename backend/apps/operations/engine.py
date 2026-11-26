@@ -8,16 +8,16 @@ from datetime import timedelta
 
 DAYS = 5
 PERIODS = 8
-DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
 # --------------------------------------------------------------------------- analytics
-def room_utilization(rooms, entries, low_threshold=30.0):
+def room_utilization(rooms, entries, low_threshold=30.0, days=DAYS, periods=PERIODS):
     """rooms: [{id, code, name, capacity, is_lab}], entries: [{room_id, ...}]."""
     used = defaultdict(int)
     for entry in entries:
         used[entry["room_id"]] += 1
-    total = DAYS * PERIODS
+    total = days * periods
     rows = []
     for room in rooms:
         pct = round(used[room["id"]] / total * 100, 1)
@@ -30,11 +30,11 @@ def room_utilization(rooms, entries, low_threshold=30.0):
     return sorted(rows, key=lambda row: row["utilization"], reverse=True)
 
 
-def demand_heatmap(rooms_count, entries):
+def demand_heatmap(rooms_count, entries, days=DAYS, periods=PERIODS):
     """Share of rooms busy at each weekday/period (0-100)."""
-    counts = [[0] * PERIODS for _ in range(DAYS)]
+    counts = [[0] * periods for _ in range(days)]
     for entry in entries:
-        if 0 <= entry["weekday"] < DAYS and 1 <= entry["period"] <= PERIODS:
+        if 0 <= entry["weekday"] < days and 1 <= entry["period"] <= periods:
             counts[entry["weekday"]][entry["period"] - 1] += 1
     denominator = max(rooms_count, 1)
     return [[round(cell / denominator * 100) for cell in row] for row in counts]

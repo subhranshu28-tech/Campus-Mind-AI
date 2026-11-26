@@ -89,8 +89,8 @@ class ManualCoverSerializer(serializers.Serializer):
 
 
 class MoveSerializer(serializers.Serializer):
-    weekday = serializers.IntegerField(min_value=0, max_value=4)
-    period = serializers.IntegerField(min_value=1, max_value=8)
+    weekday = serializers.IntegerField(min_value=0, max_value=6)
+    period = serializers.IntegerField(min_value=1, max_value=12)
     room = serializers.PrimaryKeyRelatedField(queryset=Classroom.objects.all())
     dry_run = serializers.BooleanField(default=False)
 

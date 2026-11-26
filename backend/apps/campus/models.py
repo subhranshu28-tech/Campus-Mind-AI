@@ -232,8 +232,8 @@ class FacultyAvailability(models.Model):
         ordering = ["faculty__employee_id", "weekday", "period"]
         constraints = [
             models.UniqueConstraint(fields=["faculty", "weekday", "period"], name="unique_faculty_availability_slot"),
-            models.CheckConstraint(condition=models.Q(weekday__gte=0, weekday__lte=4), name="availability_weekday_valid"),
-            models.CheckConstraint(condition=models.Q(period__gte=1, period__lte=8), name="availability_period_valid"),
+            models.CheckConstraint(condition=models.Q(weekday__gte=0, weekday__lte=6), name="availability_weekday_valid"),
+            models.CheckConstraint(condition=models.Q(period__gte=1, period__lte=12), name="availability_period_valid"),
         ]
 
     def __str__(self):
@@ -256,8 +256,8 @@ class TimetableEntry(models.Model):
             models.UniqueConstraint(fields=["section", "weekday", "period"], name="unique_section_timetable_slot"),
             models.UniqueConstraint(fields=["faculty", "weekday", "period"], name="unique_faculty_timetable_slot"),
             models.UniqueConstraint(fields=["room", "weekday", "period"], name="unique_room_timetable_slot"),
-            models.CheckConstraint(condition=models.Q(weekday__gte=0, weekday__lte=4), name="timetable_weekday_valid"),
-            models.CheckConstraint(condition=models.Q(period__gte=1, period__lte=8), name="timetable_period_valid"),
+            models.CheckConstraint(condition=models.Q(weekday__gte=0, weekday__lte=6), name="timetable_weekday_valid"),
+            models.CheckConstraint(condition=models.Q(period__gte=1, period__lte=12), name="timetable_period_valid"),
         ]
 
     def clean(self):
@@ -289,8 +289,8 @@ class ExamSchedule(models.Model):
         ordering = ["date", "start_period", "section__name"]
         indexes = [models.Index(fields=["date", "start_period"])]
         constraints = [
-            models.CheckConstraint(condition=models.Q(start_period__gte=1, start_period__lte=8), name="exam_start_period_valid"),
-            models.CheckConstraint(condition=models.Q(duration_periods__gte=1, duration_periods__lte=8), name="exam_duration_valid"),
+            models.CheckConstraint(condition=models.Q(start_period__gte=1, start_period__lte=12), name="exam_start_period_valid"),
+            models.CheckConstraint(condition=models.Q(duration_periods__gte=1, duration_periods__lte=12), name="exam_duration_valid"),
         ]
 
     def clean(self):
@@ -304,7 +304,7 @@ class ExamSchedule(models.Model):
                 errors["room"] = "Room capacity is below the section capacity."
             if self.subject_id and self.subject.is_lab and not self.room.is_lab:
                 errors["room"] = "A laboratory subject requires a laboratory room."
-        if self.start_period and self.duration_periods and self.start_period + self.duration_periods - 1 > 8:
+        if self.start_period and self.duration_periods and self.start_period + self.duration_periods - 1 > 12:
             errors["duration_periods"] = "The exam must finish within the academic day."
         if errors:
             raise ValidationError(errors)

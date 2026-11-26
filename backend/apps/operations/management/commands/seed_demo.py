@@ -35,6 +35,9 @@ def _demo_timetable(semester):
         used_room.add((entry["room_id"], entry["weekday"], entry["period"]))
 
     entries = []
+    college = semester.course.department.college
+    weekdays = college.schedule_weekdays
+    periods = college.schedule_periods
     for assignment in assignments:
         eligible = [
             room for room in rooms
@@ -48,8 +51,8 @@ def _demo_timetable(semester):
                 slot = next(
                     (
                         (weekday, period)
-                        for weekday in range(5)
-                        for period in range(1, 9)
+                        for weekday in range(weekdays)
+                        for period in range(1, periods + 1)
                         if (assignment.faculty_id, weekday, period) not in used_faculty
                         and (assignment.section_id, weekday, period) not in used_section
                         and (room.id, weekday, period) not in used_room

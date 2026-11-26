@@ -13,7 +13,7 @@ function PortalCard({ icon: Icon, label, value, detail, tone = "blue" }) {
   return <article className="panel metric-card flex items-start justify-between"><div><p className="text-sm font-medium text-slate-500">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{value}</p><p className="mt-2 text-xs text-slate-500">{detail}</p></div><span className={`metric-icon grid h-10 w-10 place-items-center rounded-xl ${tones[tone]}`}><Icon size={19} /></span></article>;
 }
 
-const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export default function StudentPortal() {
   const [portal, setPortal] = useState(null);

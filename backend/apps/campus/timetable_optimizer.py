@@ -19,13 +19,11 @@ class TimetableOptimizationError(Exception):
         return self.detail
 
 
-WEEKDAYS = range(5)
-PERIODS = range(1, 9)
 MAX_FACULTY_PERIODS_PER_DAY = 4
 OVERLOAD_PENALTY = 800
 
 
-def _faculty_open_slots(assignments):
+def _faculty_open_slots(assignments, weekdays, periods):
     faculty_ids = {assignment.faculty_id for assignment in assignments}
     availability = FacultyAvailability.objects.filter(faculty_id__in=faculty_ids)
     records_by_faculty = defaultdict(list)
@@ -41,8 +39,8 @@ def _faculty_open_slots(assignments):
         else:
             allowed[faculty_id] = {
                 (weekday, period)
-                for weekday in WEEKDAYS
-                for period in PERIODS
+                for weekday in weekdays
+                for period in periods
                 if (weekday, period) not in blocked
             }
     return allowed
@@ -59,11 +57,15 @@ def generate_timetable(semester):
             "No teaching assignments exist for this semester. Assign a subject, faculty member, and weekly periods first."
         )
 
-    rooms = list(Classroom.objects.filter(college_id=semester.course.department.college_id, is_active=True).order_by("code"))
+    college = semester.course.department.college
+    weekdays = range(college.schedule_weekdays)
+    periods = range(1, college.schedule_periods + 1)
+
+    rooms = list(Classroom.objects.filter(college_id=college.id, is_active=True).order_by("code"))
     if not rooms:
         raise TimetableOptimizationError("Add at least one active classroom or laboratory before generating a timetable.")
 
-    allowed_slots = _faculty_open_slots(assignments)
+    allowed_slots = _faculty_open_slots(assignments, weekdays, periods)
     existing_entries = TimetableEntry.objects.exclude(section__semester=semester).values(
         "faculty_id", "room_id", "weekday", "period"
     )
@@ -96,12 +98,12 @@ def generate_timetable(semester):
 
         faculty_slots = allowed_slots.get(
             assignment.faculty_id,
-            {(weekday, period) for weekday in WEEKDAYS for period in PERIODS},
+            {(weekday, period) for weekday in weekdays for period in periods},
         )
         for lesson_number in range(assignment.periods_per_week):
             lesson_vars = []
-            for weekday in WEEKDAYS:
-                for period in PERIODS:
+            for weekday in weekdays:
+                for period in periods:
                     faculty_slot = (assignment.faculty_id, weekday, period)
                     if (weekday, period) not in faculty_slots or faculty_slot in reserved_faculty:
                         continue
@@ -121,7 +123,7 @@ def generate_timetable(semester):
                         faculty_vars[(assignment.faculty_id, weekday, period)].append(variable)
                         faculty_day_vars[(assignment.faculty_id, weekday)].append(variable)
                         section_vars[(assignment.section_id, weekday, period)].append(variable)
-                        if assignment.periods_per_week <= len(WEEKDAYS):
+                        if assignment.periods_per_week <= len(weekdays):
                             assignment_day_vars[(assignment.id, weekday)].append(variable)
                         room_fit_penalty = room.capacity - assignment.section.capacity
                         objective.append((period * 100 + weekday + room_fit_penalty * 2, variable))
@@ -139,7 +141,7 @@ def generate_timetable(semester):
     # Soft wellbeing rule: discourage more than MAX_FACULTY_PERIODS_PER_DAY classes for one teacher in a day.
     for (faculty_id, weekday), day_vars in faculty_day_vars.items():
         if len(day_vars) > MAX_FACULTY_PERIODS_PER_DAY:
-            excess = model.new_int_var(0, len(PERIODS), f"excess_{faculty_id}_{weekday}")
+            excess = model.new_int_var(0, len(periods), f"excess_{faculty_id}_{weekday}")
             model.add(sum(day_vars) - MAX_FACULTY_PERIODS_PER_DAY <= excess)
             objective.append((OVERLOAD_PENALTY, excess))
 

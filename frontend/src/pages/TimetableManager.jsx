@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Lightbulb, RefreshCw, Sparkles } from "lucide-react";
 import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
-const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 function messageFrom(error) {
   const detail = error.response?.data?.detail;
@@ -18,6 +19,9 @@ export default function TimetableManager({ canManage = false }) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const { user } = useAuth();
+  const weekdays = WEEKDAY_NAMES.slice(0, user?.schedule_weekdays || 5);
+  const periodCount = user?.schedule_periods || 8;
   const [notice, setNotice] = useState("");
   const [suggestions, setSuggestions] = useState(null);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -134,11 +138,11 @@ export default function TimetableManager({ canManage = false }) {
       {!loading && semesters.length === 0 && <div className="panel mb-5 text-sm text-slate-600">First create an academic year, course, semester, section, subject, faculty member, and teaching assignment. Then add active rooms and faculty availability constraints.</div>}
 
       <div className="panel overflow-hidden !p-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 p-4"><div><h2 className="font-semibold">{activeSemester ? `${activeSemester.course_name} · Semester ${activeSemester.number}` : "Weekly schedule"}</h2><p className="mt-1 text-xs text-slate-500">Periods 1–8 · Monday–Friday</p></div><span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700"><Lightbulb size={13} />OR-Tools CP-SAT</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 p-4"><div><h2 className="font-semibold">{activeSemester ? `${activeSemester.course_name} · Semester ${activeSemester.number}` : "Weekly schedule"}</h2><p className="mt-1 text-xs text-slate-500">Periods 1–{periodCount} · {weekdays[0]}–{weekdays[weekdays.length - 1]}</p></div><span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700"><Lightbulb size={13} />OR-Tools CP-SAT</span></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[850px] table-fixed border-collapse text-left">
             <thead><tr className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"><th className="w-20 border-b border-r border-slate-100 px-3 py-3">Period</th>{weekdays.map((day) => <th key={day} className="border-b border-r border-slate-100 px-3 py-3 last:border-r-0">{day}</th>)}</tr></thead>
-            <tbody>{Array.from({ length: 8 }, (_, index) => index + 1).map((period) => <tr key={period}><th className="border-b border-r border-slate-100 bg-slate-50/60 px-3 py-3 text-xs font-semibold text-slate-500">Period {period}</th>{weekdays.map((day, weekday) => <td key={day} className="h-24 border-b border-r border-slate-100 p-1.5 align-top last:border-r-0">{(cells.get(`${weekday}:${period}`) || []).map((entry) => <article key={entry.id} className="mb-1 rounded-md border border-blue-100 bg-blue-50 p-2 text-[11px] leading-4 text-slate-700"><p className="font-semibold text-blue-800">{entry.subject_code} · {entry.section_name}</p><p className="truncate">{entry.faculty_name}</p><p className="font-medium">{entry.room_code}</p><button onClick={() => showSubstitutions(entry)} className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 hover:text-blue-900"><RefreshCw size={10} />Substitutes</button></article>)}</td>)}</tr>)}</tbody>
+            <tbody>{Array.from({ length: periodCount }, (_, index) => index + 1).map((period) => <tr key={period}><th className="border-b border-r border-slate-100 bg-slate-50/60 px-3 py-3 text-xs font-semibold text-slate-500">Period {period}</th>{weekdays.map((day, weekday) => <td key={day} className="h-24 border-b border-r border-slate-100 p-1.5 align-top last:border-r-0">{(cells.get(`${weekday}:${period}`) || []).map((entry) => <article key={entry.id} className="mb-1 rounded-md border border-blue-100 bg-blue-50 p-2 text-[11px] leading-4 text-slate-700"><p className="font-semibold text-blue-800">{entry.subject_code} · {entry.section_name}</p><p className="truncate">{entry.faculty_name}</p><p className="font-medium">{entry.room_code}</p><button onClick={() => showSubstitutions(entry)} className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 hover:text-blue-900"><RefreshCw size={10} />Substitutes</button></article>)}</td>)}</tr>)}</tbody>
           </table>
         </div>
         {entries.length === 0 && <div className="border-t border-slate-100 px-5 py-10 text-center"><p className="text-sm font-medium text-slate-600">{semesterId ? "No timetable generated for this semester yet." : "Select a semester to view its timetable."}</p><p className="mt-1 text-xs text-slate-400">Create teaching assignments and room resources, then run the optimizer.</p></div>}

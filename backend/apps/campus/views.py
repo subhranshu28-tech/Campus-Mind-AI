@@ -454,10 +454,11 @@ class TimetableEntryViewSet(viewsets.ReadOnlyModelViewSet):
             subject=entry.subject
         ).exclude(faculty=entry.faculty)
         candidate_ids = set(qualified_assignments.values_list("faculty_id", flat=True))
+        college = entry.section.semester.course.department.college
         allowed_slots = _faculty_open_slots([
             assignment for assignment in qualified_assignments.select_related("faculty")
             if assignment.faculty_id in candidate_ids
-        ])
+        ], range(college.schedule_weekdays), range(1, college.schedule_periods + 1))
         busy_ids = set(
             TimetableEntry.objects.filter(
                 weekday=entry.weekday, period=entry.period

@@ -36,6 +36,7 @@ CampusMind AI replaces scattered spreadsheets and manual coordination with a sin
 - Section / faculty / room collision prevention across semesters.
 - Preferences for earlier periods and tighter-fitting rooms.
 - Soft per-teacher daily load balancing.
+- Configurable weekdays, periods per day, and period times per college.
 - Live conflict check before moving a class (`dry_run`).
 - Excel export by section, faculty, or room.
 
@@ -310,7 +311,7 @@ Campus-Mind-AI/
 - ⏳ Live deployment verification (Render/Vercel credentials required).
 - ✅ Durable job queue (Celery/RQ) for multi-worker deployments.
 - ⏳ Fine-grained department-level object policies.
-- ⏳ Configurable school-specific period structures (currently Mon–Fri, 8 periods).
+- ✅ Configurable period structures (currently Mon–Fri, 8 periods).
 
 ---
 
