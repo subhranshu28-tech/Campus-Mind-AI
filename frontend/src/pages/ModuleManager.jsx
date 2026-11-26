@@ -182,6 +182,15 @@ const modules = {
       { name: "max_marks", label: "Max marks", type: "number", defaultValue: 100, required: true },
     ],
   },
+  "fee-structures": {
+    endpoint: "fee-structures", orderingField: "name", columns: [["name", "Fee structure"], ["amount", "Amount"], ["is_active", "Active"], ["created_at", "Created"]],
+    fields: [
+      { name: "name", label: "Name", required: true },
+      { name: "amount", label: "Amount", type: "number", min: 0, required: true },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "is_active", label: "Active", type: "checkbox", defaultValue: true },
+    ],
+  },
   invoices: {
     endpoint: "invoices", orderingField: "-created_at", columns: [["student_name", "Student"], ["fee_structure_name", "Fee"], ["amount", "Amount"], ["due_date", "Due"], ["status", "Status"]],
     fields: [
@@ -190,6 +199,15 @@ const modules = {
       { name: "amount", label: "Amount", type: "number", required: true },
       { name: "due_date", label: "Due date", type: "date", required: true },
       { name: "status", label: "Status", type: "select", options: [["pending", "Pending"], ["paid", "Paid"], ["overdue", "Overdue"], ["cancelled", "Cancelled"]], defaultValue: "pending", required: true },
+    ],
+  },
+  payments: {
+    endpoint: "payments", orderingField: "-paid_on", columns: [["invoice_label", "Invoice"], ["amount", "Amount"], ["method", "Method"], ["reference", "Reference"], ["paid_on", "Paid"]],
+    fields: [
+      { name: "invoice", label: "Invoice", type: "select", endpoint: "invoices", optionLabel: "student_name", required: true, numeric: true },
+      { name: "amount", label: "Amount", type: "number", min: 0, required: true },
+      { name: "method", label: "Method", defaultValue: "cash", required: true },
+      { name: "reference", label: "Reference" },
     ],
   },
   books: {
@@ -202,6 +220,17 @@ const modules = {
       { name: "available_copies", label: "Available copies", type: "number", defaultValue: 1, required: true },
     ],
   },
+  "book-issues": {
+    endpoint: "book-issues", orderingField: "-issued_on", columns: [["book_title", "Book"], ["student_name", "Student"], ["issued_on", "Issued"], ["due_on", "Due"], ["status", "Status"], ["fine", "Fine"]],
+    fields: [
+      { name: "book", label: "Book", type: "select", endpoint: "books", optionLabel: "title", required: true, numeric: true },
+      { name: "student", label: "Student", type: "select", endpoint: "students", optionLabel: "student_id", required: true, numeric: true },
+      { name: "due_on", label: "Due date", type: "date", required: true },
+      { name: "status", label: "Status", type: "select", options: [["issued", "Issued"], ["returned", "Returned"], ["overdue", "Overdue"]], defaultValue: "issued" },
+      { name: "returned_on", label: "Returned on", type: "date", optional: true },
+      { name: "fine", label: "Fine", type: "number", min: 0, defaultValue: 0 },
+    ],
+  },
   hostels: {
     endpoint: "hostels", orderingField: "name", columns: [["name", "Hostel"], ["gender", "Gender"], ["capacity", "Capacity"], ["warden", "Warden"]],
     fields: [
@@ -209,6 +238,22 @@ const modules = {
       { name: "gender", label: "Gender", type: "select", options: [["male", "Male"], ["female", "Female"], ["mixed", "Mixed"]], defaultValue: "mixed", required: true },
       { name: "capacity", label: "Capacity", type: "number", defaultValue: 0, required: true },
       { name: "warden", label: "Warden" },
+    ],
+  },
+  "hostel-rooms": {
+    endpoint: "hostel-rooms", orderingField: "room_number", columns: [["hostel_name", "Hostel"], ["room_number", "Room"], ["capacity", "Capacity"], ["occupied", "Occupied"]],
+    fields: [
+      { name: "hostel", label: "Hostel", type: "select", endpoint: "hostels", optionLabel: "name", required: true, numeric: true },
+      { name: "room_number", label: "Room number", required: true },
+      { name: "capacity", label: "Capacity", type: "number", min: 1, defaultValue: 2, required: true },
+    ],
+  },
+  "hostel-allocations": {
+    endpoint: "hostel-allocations", orderingField: "-allocated_on", columns: [["student_name", "Student"], ["room_label", "Room"], ["allocated_on", "Allocated"], ["is_active", "Active"]],
+    fields: [
+      { name: "student", label: "Student", type: "select", endpoint: "students", optionLabel: "student_id", required: true, numeric: true },
+      { name: "room", label: "Room", type: "select", endpoint: "hostel-rooms", optionLabel: "room_number", required: true, numeric: true },
+      { name: "is_active", label: "Active", type: "checkbox", defaultValue: true },
     ],
   },
   "transport-routes": {
@@ -220,6 +265,25 @@ const modules = {
       { name: "fare", label: "Fare", type: "number", defaultValue: 0, required: true },
     ],
   },
+  vehicles: {
+    endpoint: "vehicles", orderingField: "registration_number", columns: [["registration_number", "Registration"], ["route_name", "Route"], ["capacity", "Capacity"], ["driver_name", "Driver"]],
+    fields: [
+      { name: "registration_number", label: "Registration number", required: true },
+      { name: "route", label: "Route", type: "select", endpoint: "transport-routes", optionLabel: "name", optional: true, numeric: true },
+      { name: "capacity", label: "Capacity", type: "number", min: 0, defaultValue: 40 },
+      { name: "driver_name", label: "Driver name" },
+      { name: "driver_phone", label: "Driver phone" },
+    ],
+  },
+  "student-transport": {
+    endpoint: "student-transport", orderingField: "-allocated_on", columns: [["student_name", "Student"], ["route_name", "Route"], ["pickup_point", "Pickup"], ["is_active", "Active"]],
+    fields: [
+      { name: "student", label: "Student", type: "select", endpoint: "students", optionLabel: "student_id", required: true, numeric: true },
+      { name: "route", label: "Route", type: "select", endpoint: "transport-routes", optionLabel: "name", required: true, numeric: true },
+      { name: "pickup_point", label: "Pickup point" },
+      { name: "is_active", label: "Active", type: "checkbox", defaultValue: true },
+    ],
+  },
   companies: {
     endpoint: "companies", orderingField: "name", columns: [["name", "Company"], ["industry", "Industry"], ["website", "Website"], ["contact_person", "Contact"]],
     fields: [
@@ -228,6 +292,27 @@ const modules = {
       { name: "website", label: "Website" },
       { name: "contact_person", label: "Contact person" },
       { name: "contact_email", label: "Contact email", type: "email" },
+    ],
+  },
+  "job-postings": {
+    endpoint: "job-postings", orderingField: "-created_at", columns: [["title", "Role"], ["company_name", "Company"], ["package", "Package"], ["deadline", "Deadline"], ["is_active", "Active"]],
+    fields: [
+      { name: "company", label: "Company", type: "select", endpoint: "companies", optionLabel: "name", required: true, numeric: true },
+      { name: "title", label: "Job title", required: true },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "eligibility", label: "Eligibility", type: "textarea" },
+      { name: "package", label: "Package" },
+      { name: "deadline", label: "Deadline", type: "date", optional: true },
+      { name: "is_active", label: "Active", type: "checkbox", defaultValue: true },
+    ],
+  },
+  "placement-applications": {
+    endpoint: "placement-applications", orderingField: "-applied_on", columns: [["student_name", "Student"], ["job_title", "Job"], ["status", "Status"], ["applied_on", "Applied"]],
+    fields: [
+      { name: "student", label: "Student", type: "select", endpoint: "students", optionLabel: "student_id", required: true, numeric: true },
+      { name: "job", label: "Job", type: "select", endpoint: "job-postings", optionLabel: "title", required: true, numeric: true },
+      { name: "status", label: "Status", type: "select", options: [["applied", "Applied"], ["shortlisted", "Shortlisted"], ["selected", "Selected"], ["rejected", "Rejected"]], defaultValue: "applied" },
+      { name: "remarks", label: "Remarks", type: "textarea" },
     ],
   },
 };
