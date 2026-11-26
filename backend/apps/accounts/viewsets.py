@@ -15,7 +15,14 @@ from rest_framework import serializers, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
 
-from .tenancy import TENANT_LOOKUPS, scope_queryset, tenant_id_for
+from .tenancy import (
+    DEPARTMENT_LOOKUPS,
+    TENANT_LOOKUPS,
+    department_id_for,
+    department_id_for_object,
+    scope_queryset,
+    tenant_id_for,
+)
 
 STAFF_WRITE_ROLES = frozenset({"super_admin", "college_admin", "hod"})
 
@@ -52,6 +59,14 @@ class TenantModelViewSet(viewsets.ModelViewSet):
         queryset = scope_queryset(super().get_queryset(), self.request.user)
         if getattr(self.request.user, "role", None) == "student":
             return self._scope_for_student(queryset)
+        # Department-level scoping for HODs.
+        if getattr(self.request.user, "role", None) == "hod":
+            dept_id = department_id_for(self.request.user)
+            lookup = DEPARTMENT_LOOKUPS.get(queryset.model.__name__)
+            if lookup:
+                if dept_id is None:
+                    return queryset.none()
+                queryset = queryset.filter(**{lookup: dept_id})
         return queryset
 
     def _scope_for_student(self, queryset):
@@ -105,6 +120,15 @@ class TenantModelViewSet(viewsets.ModelViewSet):
             lookup = TENANT_LOOKUPS.get(related_model.__name__)
             if lookup:
                 field.queryset = queryset.filter(**{lookup: college_id})
+            if (
+                getattr(self.request.user, "role", None) == "hod"
+                and related_model.__name__ in DEPARTMENT_LOOKUPS
+            ):
+                dept_id = department_id_for(self.request.user)
+                if dept_id is not None:
+                    field.queryset = field.queryset.filter(
+                        **{DEPARTMENT_LOOKUPS[related_model.__name__]: dept_id}
+                    )
         return serializer
 
     def _validate_tenant_relations(self, serializer):
@@ -119,6 +143,22 @@ class TenantModelViewSet(viewsets.ModelViewSet):
                     {"detail": "Related records must belong to your college."}
                 )
 
+    def _validate_department_relations(self, serializer):
+        user = self.request.user
+        if getattr(user, "role", None) != "hod":
+            return
+        dept_id = department_id_for(user)
+        if dept_id is None:
+            return
+        for value in serializer.validated_data.values():
+            if value is None or not hasattr(value, "_meta"):
+                continue
+            related_dept = department_id_for_object(value)
+            if related_dept is not None and related_dept != dept_id:
+                raise ValidationError(
+                    {"detail": "Related records must belong to your department."}
+                )
+
     def get_create_kwargs(self):
         """Extra ``serializer.save()`` arguments for subclasses."""
 
@@ -126,13 +166,22 @@ class TenantModelViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self._validate_tenant_relations(serializer)
+        self._validate_department_relations(serializer)
         kwargs = self.get_create_kwargs()
         if any(field.name == "college" for field in serializer.Meta.model._meta.fields):
             kwargs["college_id"] = self.request.user.college_id
+        if (
+            getattr(self.request.user, "role", None) == "hod"
+            and any(field.name == "department" for field in serializer.Meta.model._meta.fields)
+        ):
+            dept_id = department_id_for(self.request.user)
+            if dept_id is not None:
+                kwargs["department_id"] = dept_id
         serializer.save(**kwargs)
 
     def perform_update(self, serializer):
         self._validate_tenant_relations(serializer)
+        self._validate_department_relations(serializer)
         serializer.save()
 
     def perform_destroy(self, instance):

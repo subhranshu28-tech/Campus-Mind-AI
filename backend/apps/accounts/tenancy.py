@@ -35,8 +35,79 @@ TENANT_LOOKUPS = {
     "StudentTransport": "route__college_id",
     "Company": "college_id",
     "JobPosting": "company__college_id",
+    "Submission": "assignment__college_id",
+    "FeeStructure": "college_id",
+    "Invoice": "college_id",
+    "Payment": "invoice__college_id",
+    "Book": "college_id",
+    "BookIssue": "book__college_id",
+    "Hostel": "college_id",
+    "HostelRoom": "hostel__college_id",
+    "HostelAllocation": "room__hostel__college_id",
+    "TransportRoute": "college_id",
+    "Vehicle": "route__college_id",
+    "StudentTransport": "route__college_id",
+    "Company": "college_id",
+    "JobPosting": "company__college_id",
     "PlacementApplication": "job__company__college_id",
 }
+
+
+# Paths from each tenant-owned model to its Department row (where one exists).
+# Models without a department (college-level records such as classrooms, fees,
+# hostels, ...) are absent and are visible to every HOD in the college.
+DEPARTMENT_LOOKUPS = {
+    "Department": "id",
+    "Course": "department_id",
+    "Semester": "course__department_id",
+    "Section": "semester__course__department_id",
+    "Subject": "course__department_id",
+    "Student": "department_id",
+    "Faculty": "department_id",
+    "TeachingAssignment": "section__semester__course__department_id",
+    "AttendanceRecord": "student__department_id",
+    "TimetableEntry": "section__semester__course__department_id",
+    "ExamSchedule": "section__semester__course__department_id",
+    "FacultyAvailability": "faculty__department_id",
+    "SubjectNote": "subject__course__department_id",
+    "PreviousYearQuestionPaper": "subject__course__department_id",
+    "FacultyLeave": "faculty__department_id",
+    "Substitution": "section__semester__course__department_id",
+    "Assignment": "section__semester__course__department_id",
+    "Submission": "assignment__section__semester__course__department_id",
+}
+
+
+def department_id_for(user):
+    """Return the department a HOD is scoped to, or None."""
+
+    if not user or not getattr(user, "is_authenticated", False):
+        return None
+    if getattr(user, "role", None) != "hod":
+        return None
+    headed = getattr(user, "headed_departments", None)
+    if headed is not None:
+        department = headed.first()
+        if department is not None:
+            return department.id
+    try:
+        return user.faculty_record.department_id
+    except Exception:
+        return None
+
+
+def department_id_for_object(obj):
+    if obj is None:
+        return None
+    lookup = DEPARTMENT_LOOKUPS.get(obj.__class__.__name__)
+    if not lookup:
+        return None
+    value = obj
+    for part in lookup.split("__"):
+        value = getattr(value, part, None)
+        if value is None:
+            return None
+    return value
 
 def scope_queryset(queryset, user):
     if not user or not user.is_authenticated or not getattr(user, "college_id", None):
