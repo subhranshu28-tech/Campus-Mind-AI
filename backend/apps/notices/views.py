@@ -1,11 +1,16 @@
+from django.conf import settings
+from django.core.mail import send_mail
 from django.utils import timezone
 
+from django.contrib.auth import get_user_model
 from rest_framework import permissions, viewsets
 from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.tenancy import scope_queryset
 from .models import CampusEvent, Notice, NoticeAudience
 from .serializers import CampusEventSerializer, NoticeSerializer
+
+User = get_user_model()
 
 
 class IsNoticeManager(permissions.BasePermission):
@@ -48,7 +53,33 @@ class NoticeViewSet(viewsets.ModelViewSet):
         college_id = getattr(self.request.user, "college_id", None)
         if not college_id:
             raise PermissionDenied("A college workspace is required.")
-        serializer.save(college_id=college_id, created_by=self.request.user)
+        instance = serializer.save(college_id=college_id, created_by=self.request.user)
+        self._email_notice(instance)
+
+    def _email_notice(self, notice):
+        role_filter = None
+        if notice.audience == NoticeAudience.STUDENTS:
+            role_filter = ["student"]
+        elif notice.audience == NoticeAudience.FACULTY:
+            role_filter = ["faculty"]
+        elif notice.audience == NoticeAudience.MANAGERS:
+            role_filter = ["super_admin", "college_admin", "hod"]
+        users = User.objects.filter(college_id=notice.college_id, is_active=True)
+        if role_filter:
+            users = users.filter(role__in=role_filter)
+        recipients = [u.email for u in users if u.email]
+        if not recipients:
+            return
+        try:
+            send_mail(
+                subject=f"Campus notice: {notice.title}",
+                message=notice.body,
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                recipient_list=recipients,
+                fail_silently=True,
+            )
+        except Exception:
+            pass
 
 
 class CampusEventViewSet(viewsets.ModelViewSet):
