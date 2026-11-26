@@ -43,7 +43,7 @@ def enqueue_timetable_job(semester, user):
 
 def _start_worker(job_id):
     worker = threading.Thread(
-        target=run_timetable_job,
+        target=_worker_entry,
         args=(job_id,),
         name=f"timetable-job-{job_id}",
         daemon=True,
@@ -52,16 +52,24 @@ def _start_worker(job_id):
     return worker
 
 
+def _worker_entry(job_id):
+    """Thread entry point: own the thread-local DB connection lifecycle."""
+
+    close_old_connections()
+    try:
+        run_timetable_job(job_id)
+    finally:
+        close_old_connections()
+
+
 def run_timetable_job(job_id):
     """Execute one job, recording success or the failure reason."""
 
-    close_old_connections()
     try:
         job = TimetableJob.objects.select_related(
             "semester__course__department"
         ).get(pk=job_id)
     except TimetableJob.DoesNotExist:
-        close_old_connections()
         return None
 
     job.status = "running"
@@ -85,5 +93,4 @@ def run_timetable_job(job_id):
     finally:
         job.finished_at = timezone.now()
         job.save(update_fields=["status", "entry_count", "error", "finished_at"])
-        close_old_connections()
     return job
