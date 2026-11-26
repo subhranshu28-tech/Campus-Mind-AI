@@ -4,7 +4,7 @@ from .models import User
 
 
 class TenantScopedUniqueNameMixin:
-    """Check a ``(college, name)`` unique constraint in the serializer.
+    """Check ``(college, <field>)`` unique constraints in the serializer.
 
     The ``college`` field is read-only on tenant-owned serializers (it is set
     from the session), so DRF skips its automatic ``UniqueTogetherValidator``.
@@ -12,28 +12,26 @@ class TenantScopedUniqueNameMixin:
     insert fail with an ``IntegrityError``.
     """
 
-    unique_name_field = "name"
-    unique_name_message = "A record with this name already exists in your college."
+    unique_name_fields = ("name",)
+    unique_name_message = "A record with this {field} already exists in your college."
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
         request = self.context.get("request")
         college_id = getattr(getattr(request, "user", None), "college_id", None)
         if college_id:
-            name = attrs.get(
-                self.unique_name_field,
-                getattr(self.instance, self.unique_name_field, None),
-            )
-            if name is not None:
+            for field in self.unique_name_fields:
+                value = attrs.get(field, getattr(self.instance, field, None))
+                if value is None:
+                    continue
                 queryset = self.Meta.model.objects.filter(
-                    college_id=college_id,
-                    **{self.unique_name_field: name},
+                    college_id=college_id, **{field: value}
                 )
                 if self.instance is not None:
                     queryset = queryset.exclude(pk=self.instance.pk)
                 if queryset.exists():
                     raise serializers.ValidationError(
-                        {self.unique_name_field: self.unique_name_message}
+                        {field: self.unique_name_message.format(field=field)}
                     )
         return attrs
 

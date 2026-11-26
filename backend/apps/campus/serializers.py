@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError as ApiValidationError
 from rest_framework import serializers
 
+from apps.accounts.serializers import TenantScopedUniqueNameMixin
 from apps.accounts.tenancy import tenant_id_for
 
 from .models import (
@@ -87,7 +88,7 @@ class CampusAccountSerializer(serializers.ModelSerializer):
         return instance
 
 
-class DepartmentSerializer(serializers.ModelSerializer):
+class DepartmentSerializer(TenantScopedUniqueNameMixin, serializers.ModelSerializer):
     head_name = serializers.CharField(source="head.get_full_name", read_only=True)
     student_count = serializers.IntegerField(read_only=True)
 
@@ -95,6 +96,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
         model = Department
         fields = ("id", "name", "code", "head", "head_name", "student_count", "is_active", "created_at")
         read_only_fields = ("created_at",)
+        unique_name_fields = ("name", "code")
 
     def validate_head(self, user):
         if user and user.role not in {"hod", "faculty"}:
@@ -184,11 +186,12 @@ class FacultySerializer(serializers.ModelSerializer):
         return instance
 
 
-class AcademicYearSerializer(serializers.ModelSerializer):
+class AcademicYearSerializer(TenantScopedUniqueNameMixin, serializers.ModelSerializer):
     class Meta:
         model = AcademicYear
         fields = ("id", "name", "starts_on", "ends_on", "is_active", "created_at")
         read_only_fields = ("created_at",)
+        unique_name_fields = ("name",)
 
     def validate(self, attrs):
         starts_on = attrs.get("starts_on", getattr(self.instance, "starts_on", None))
@@ -341,10 +344,11 @@ class PreviousYearQuestionPaperSerializer(SubjectNoteSerializer):
         return value
 
 
-class ClassroomSerializer(serializers.ModelSerializer):
+class ClassroomSerializer(TenantScopedUniqueNameMixin, serializers.ModelSerializer):
     class Meta:
         model = Classroom
         fields = ("id", "name", "code", "capacity", "is_lab", "is_active")
+        unique_name_fields = ("code",)
 
     def validate_capacity(self, value):
         if value < 1:
