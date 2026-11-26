@@ -32,6 +32,12 @@ const navigation = [
   { label: "Previous question papers", icon: ClipboardList, module: "question-papers" },
   { label: "Notices", icon: Bell, module: "notices" },
   { label: "Events", icon: CalendarDays, module: "events" },
+  { label: "Assignments", icon: ClipboardList, module: "assignments" },
+  { label: "Fees", icon: FileText, module: "invoices" },
+  { label: "Library", icon: BookOpen, module: "books" },
+  { label: "Hostel", icon: Building2, module: "hostels" },
+  { label: "Transport", icon: Activity, module: "transport-routes" },
+  { label: "Placements", icon: Users, module: "companies" },
   { label: "AI assistant", icon: Sparkles, module: "ai" },
 ];
 const studentNavigation = [

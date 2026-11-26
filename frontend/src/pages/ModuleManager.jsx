@@ -170,6 +170,66 @@ const modules = {
       { name: "ends_at", label: "Ends", type: "datetime", required: true },
     ],
   },
+  assignments: {
+    endpoint: "assignments", orderingField: "-due_at", columns: [["title", "Title"], ["subject_name", "Subject"], ["section_name", "Section"], ["due_at", "Due"], ["max_marks", "Marks"]],
+    fields: [
+      { name: "title", label: "Title", required: true },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "subject", label: "Subject", type: "select", endpoint: "subjects", optionLabel: "name", required: true, numeric: true },
+      { name: "section", label: "Section", type: "select", endpoint: "sections", optionLabel: "semester_label", required: true, numeric: true },
+      { name: "faculty", label: "Faculty", type: "select", endpoint: "faculty", optionLabel: "user_name", required: true, numeric: true },
+      { name: "due_at", label: "Due at", type: "datetime", required: true },
+      { name: "max_marks", label: "Max marks", type: "number", defaultValue: 100, required: true },
+    ],
+  },
+  invoices: {
+    endpoint: "invoices", orderingField: "-created_at", columns: [["student_name", "Student"], ["fee_structure_name", "Fee"], ["amount", "Amount"], ["due_date", "Due"], ["status", "Status"]],
+    fields: [
+      { name: "student", label: "Student", type: "select", endpoint: "students", optionLabel: "student_id", required: true, numeric: true },
+      { name: "fee_structure", label: "Fee structure", type: "select", endpoint: "fee-structures", optionLabel: "name", required: true, numeric: true },
+      { name: "amount", label: "Amount", type: "number", required: true },
+      { name: "due_date", label: "Due date", type: "date", required: true },
+      { name: "status", label: "Status", type: "select", options: [["pending", "Pending"], ["paid", "Paid"], ["overdue", "Overdue"], ["cancelled", "Cancelled"]], defaultValue: "pending", required: true },
+    ],
+  },
+  books: {
+    endpoint: "books", orderingField: "title", columns: [["title", "Title"], ["author", "Author"], ["isbn", "ISBN"], ["available_copies", "Available"], ["total_copies", "Total"]],
+    fields: [
+      { name: "title", label: "Title", required: true },
+      { name: "author", label: "Author" },
+      { name: "isbn", label: "ISBN" },
+      { name: "total_copies", label: "Total copies", type: "number", defaultValue: 1, required: true },
+      { name: "available_copies", label: "Available copies", type: "number", defaultValue: 1, required: true },
+    ],
+  },
+  hostels: {
+    endpoint: "hostels", orderingField: "name", columns: [["name", "Hostel"], ["gender", "Gender"], ["capacity", "Capacity"], ["warden", "Warden"]],
+    fields: [
+      { name: "name", label: "Name", required: true },
+      { name: "gender", label: "Gender", type: "select", options: [["male", "Male"], ["female", "Female"], ["mixed", "Mixed"]], defaultValue: "mixed", required: true },
+      { name: "capacity", label: "Capacity", type: "number", defaultValue: 0, required: true },
+      { name: "warden", label: "Warden" },
+    ],
+  },
+  "transport-routes": {
+    endpoint: "transport-routes", orderingField: "name", columns: [["name", "Route"], ["origin", "Origin"], ["destination", "Destination"], ["fare", "Fare"]],
+    fields: [
+      { name: "name", label: "Name", required: true },
+      { name: "origin", label: "Origin" },
+      { name: "destination", label: "Destination" },
+      { name: "fare", label: "Fare", type: "number", defaultValue: 0, required: true },
+    ],
+  },
+  companies: {
+    endpoint: "companies", orderingField: "name", columns: [["name", "Company"], ["industry", "Industry"], ["website", "Website"], ["contact_person", "Contact"]],
+    fields: [
+      { name: "name", label: "Name", required: true },
+      { name: "industry", label: "Industry" },
+      { name: "website", label: "Website" },
+      { name: "contact_person", label: "Contact person" },
+      { name: "contact_email", label: "Contact email", type: "email" },
+    ],
+  },
 };
 
 function getValue(object, path) {

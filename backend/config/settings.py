@@ -54,6 +54,12 @@ INSTALLED_APPS = [
     "apps.campus",
     "apps.operations",
     "apps.notices",
+    "apps.assignments",
+    "apps.fees",
+    "apps.library",
+    "apps.hostel",
+    "apps.transport",
+    "apps.placements",
 ]
 if os.getenv("AWS_STORAGE_BUCKET_NAME"):
     INSTALLED_APPS.append("storages")

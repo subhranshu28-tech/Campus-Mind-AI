@@ -19,6 +19,22 @@ TENANT_LOOKUPS = {
     "AuditLog": "college_id",
     "Notice": "college_id",
     "CampusEvent": "college_id",
+    "Assignment": "college_id",
+    "Submission": "assignment__college_id",
+    "FeeStructure": "college_id",
+    "Invoice": "college_id",
+    "Payment": "invoice__college_id",
+    "Book": "college_id",
+    "BookIssue": "book__college_id",
+    "Hostel": "college_id",
+    "HostelRoom": "hostel__college_id",
+    "HostelAllocation": "room__hostel__college_id",
+    "TransportRoute": "college_id",
+    "Vehicle": "route__college_id",
+    "StudentTransport": "route__college_id",
+    "Company": "college_id",
+    "JobPosting": "company__college_id",
+    "PlacementApplication": "job__company__college_id",
 }
 
 def scope_queryset(queryset, user):
