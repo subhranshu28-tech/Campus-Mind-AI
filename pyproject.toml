@@ -1,0 +1,28 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+exclude = [
+  ".git",
+  ".venv",
+  "venv",
+  "backend/**/migrations/**",
+  "frontend",
+  "staticfiles",
+]
+
+[tool.ruff.lint]
+# Full style rules for local development; CI enforces the critical subset
+# below so existing code can be cleaned up incrementally.
+select = ["E4", "E7", "E9", "F", "I", "B"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.coverage.run]
+source = ["backend/apps"]
+omit = ["*/migrations/*", "*/tests*.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

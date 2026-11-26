@@ -3,6 +3,11 @@ import api from "../services/api";
 
 const AuthContext = createContext(null);
 
+function clearStoredSession() {
+  sessionStorage.removeItem("campus.access");
+  sessionStorage.removeItem("campus.refresh");
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
@@ -17,8 +22,7 @@ export function AuthProvider({ children }) {
         const { data } = await api.get("/auth/me/");
         setUser(data);
       } catch {
-        sessionStorage.removeItem("campus.access");
-        sessionStorage.removeItem("campus.refresh");
+        clearStoredSession();
       } finally {
         setChecking(false);
       }
@@ -40,16 +44,25 @@ export function AuthProvider({ children }) {
         const profile = await api.get("/auth/me/");
         setUser(profile.data);
       } catch (error) {
-        sessionStorage.removeItem("campus.access");
-        sessionStorage.removeItem("campus.refresh");
+        clearStoredSession();
         setUser(null);
         throw error;
       }
     },
-    logout() {
-      sessionStorage.removeItem("campus.access");
-      sessionStorage.removeItem("campus.refresh");
+    async logout() {
+      const refresh = sessionStorage.getItem("campus.refresh");
+      const access = sessionStorage.getItem("campus.access");
+      clearStoredSession();
       setUser(null);
+      if (!refresh) return;
+      try {
+        // Revoke the refresh token server-side as well as clearing the tab.
+        await api.post("/auth/logout/", { refresh }, {
+          headers: access ? { Authorization: `Bearer ${access}` } : undefined,
+        });
+      } catch {
+        // Logout must always succeed locally even if the network is down.
+      }
     },
   }), [user, checking]);
 

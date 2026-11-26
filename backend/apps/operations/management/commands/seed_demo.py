@@ -8,8 +8,67 @@ from apps.accounts.models import College, User
 from apps.campus.models import (
     AcademicYear, Classroom, Course, Department, Faculty, Section, Semester, Student, Subject, TeachingAssignment,
 )
-from apps.campus.timetable_optimizer import generate_timetable
 from apps.campus.models import TimetableEntry
+
+
+def _demo_timetable(semester):
+    """Build a small conflict-free demo timetable without the OR-Tools solver.
+
+    The demo command must work on machines where the optional optimisation
+    dependency is unavailable (for example, Python 3.14, which has no OR-Tools
+    wheel yet). Managers can still use the optimiser from the timetable page.
+    """
+    assignments = list(
+        TeachingAssignment.objects.filter(section__semester=semester)
+        .select_related("section", "subject", "faculty")
+        .order_by("section_id", "subject_id")
+    )
+    rooms = list(Classroom.objects.filter(college=semester.course.department.college, is_active=True).order_by("code"))
+    used_faculty = set()
+    used_section = set()
+    used_room = set()
+    for entry in TimetableEntry.objects.exclude(section__semester=semester).values(
+        "faculty_id", "section_id", "room_id", "weekday", "period"
+    ):
+        used_faculty.add((entry["faculty_id"], entry["weekday"], entry["period"]))
+        used_section.add((entry["section_id"], entry["weekday"], entry["period"]))
+        used_room.add((entry["room_id"], entry["weekday"], entry["period"]))
+
+    entries = []
+    for assignment in assignments:
+        eligible = [
+            room for room in rooms
+            if room.capacity >= assignment.section.capacity
+            and (not assignment.subject.is_lab or room.is_lab)
+        ]
+        if not eligible:
+            raise ValueError(f"No suitable room for {assignment.subject} in section {assignment.section}.")
+        for lesson in range(assignment.periods_per_week):
+            for room in eligible:
+                slot = next(
+                    (
+                        (weekday, period)
+                        for weekday in range(5)
+                        for period in range(1, 9)
+                        if (assignment.faculty_id, weekday, period) not in used_faculty
+                        and (assignment.section_id, weekday, period) not in used_section
+                        and (room.id, weekday, period) not in used_room
+                    ),
+                    None,
+                )
+                if slot:
+                    break
+            if not slot:
+                raise ValueError(f"No free slot for {assignment.subject} in section {assignment.section}.")
+            weekday, period = slot
+            used_faculty.add((assignment.faculty_id, weekday, period))
+            used_section.add((assignment.section_id, weekday, period))
+            used_room.add((room.id, weekday, period))
+            entries.append(TimetableEntry(
+                assignment=assignment, section=assignment.section, subject=assignment.subject,
+                faculty=assignment.faculty, room=room, weekday=weekday, period=period,
+            ))
+    return entries
 
 
 class Command(BaseCommand):
@@ -59,6 +118,6 @@ class Command(BaseCommand):
             Student.objects.create(user=user, student_id=f"S26{number:03d}", department=dept, semester=3,
                                    section=sections[number % 2], enrolled_on=date(2026, 7, 15))
 
-        TimetableEntry.objects.bulk_create(generate_timetable(semester))
+        TimetableEntry.objects.bulk_create(_demo_timetable(semester))
         self.stdout.write(self.style.SUCCESS("Demo college created: 6 faculty, 6 students, 6 rooms, generated timetable."))
         self.stdout.write(f"Demo logins: faculty1..faculty6 and student1..student6 / password: {password}")

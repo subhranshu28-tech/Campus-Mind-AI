@@ -26,8 +26,24 @@ class FacultyLeaveSerializer(serializers.ModelSerializer):
         return obj.substitutions.filter(status="assigned").count()
 
     def validate(self, attrs):
-        if attrs["end_date"] < attrs["start_date"]:
+        start = attrs.get("start_date", getattr(self.instance, "start_date", None))
+        end = attrs.get("end_date", getattr(self.instance, "end_date", None))
+        if start and end and end < start:
             raise serializers.ValidationError({"end_date": "End date cannot be before the start date."})
+        faculty = attrs.get("faculty", getattr(self.instance, "faculty", None))
+        if faculty and start and end:
+            overlapping = FacultyLeave.objects.filter(
+                faculty=faculty,
+                status__in=[FacultyLeave.Status.PENDING, FacultyLeave.Status.APPROVED],
+                start_date__lte=end,
+                end_date__gte=start,
+            )
+            if self.instance:
+                overlapping = overlapping.exclude(pk=self.instance.pk)
+            if overlapping.exists():
+                raise serializers.ValidationError(
+                    {"start_date": "This faculty member already has a pending or approved leave in that period."}
+                )
         return attrs
 
 
@@ -60,7 +76,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AuditLog
-        fields = ("id", "actor_name", "action", "entity", "entity_id", "detail", "created_at")
+        fields = ("id", "actor_name", "action", "entity", "entity_id", "detail", "college", "created_at")
 
     def get_actor_name(self, obj):
         return (obj.actor.get_full_name() or obj.actor.username) if obj.actor else "System"

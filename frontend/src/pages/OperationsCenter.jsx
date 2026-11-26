@@ -9,7 +9,6 @@ const tabs = [
   { id: "exams", label: "Exam planner" },
   { id: "audit", label: "Audit trail" },
 ];
-const items = (data) => data?.results ?? data ?? [];
 const errorText = (error) => {
   const data = error?.response?.data;
   if (!data) return "Request failed. Please try again.";
@@ -36,8 +35,8 @@ function Analytics() {
 
   useEffect(() => {
     api.get("/analytics/overview/").then(({ data: body }) => setData(body)).catch((e) => setError(errorText(e)));
-    Promise.all([api.get("/sections/"), api.get("/faculty/"), api.get("/classrooms/")])
-      .then(([s, f, r]) => setLists({ sections: items(s.data), faculty: items(f.data), rooms: items(r.data) })).catch(() => {});
+    Promise.all([api.getAll("/sections/"), api.getAll("/faculty/"), api.getAll("/classrooms/")])
+      .then(([sections, faculty, rooms]) => setLists({ sections, faculty, rooms })).catch(() => {});
   }, []);
 
   const options = scope === "section" ? lists.sections.map((x) => [x.id, `${x.semester_label} · ${x.name}`])
@@ -96,10 +95,10 @@ function Cover({ canManage }) {
   const [uncovered, setUncovered] = useState({});
 
   const load = () => {
-    api.get("/leaves/").then(({ data }) => setLeaves(items(data))).catch((e) => setError(errorText(e)));
-    api.get("/substitutions/", { params: { upcoming: 1 } }).then(({ data }) => setCovers(items(data))).catch(() => {});
+    api.getAll("/leaves/").then(setLeaves).catch((e) => setError(errorText(e)));
+    api.getAll("/substitutions/", { params: { upcoming: 1 } }).then(setCovers).catch(() => {});
   };
-  useEffect(() => { load(); if (canManage) api.get("/faculty/").then(({ data }) => setFaculty(items(data))).catch(() => {}); }, [canManage]);
+  useEffect(() => { load(); if (canManage) api.getAll("/faculty/").then(setFaculty).catch(() => {}); }, [canManage]);
 
   const run = async (task, success) => {
     setBusy(true); setError(""); setMessage("");
@@ -147,8 +146,11 @@ function Exams() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { api.get("/semesters/").then(({ data }) => setSemesters(items(data))).catch(() => {}); }, []);
+  useEffect(() => { api.getAll("/semesters/").then(setSemesters).catch(() => {}); }, []);
 
+  // Any form change invalidates the preview so Publish can never send values
+  // that were never previewed.
+  const updateForm = (patch) => { setForm((current) => ({ ...current, ...patch })); setResult(null); };
   const run = async (preview) => {
     setBusy(true); setError("");
     try { const { data } = await api.post("/exams/auto-schedule/", { ...form, preview }); setResult(data); } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
@@ -157,11 +159,11 @@ function Exams() {
   return (
     <div className="space-y-5">
       <section className="panel grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="text-sm font-medium text-slate-700 lg:col-span-2">Semester<select className="field mt-1.5" value={form.semester} onChange={(e) => setForm({ ...form, semester: e.target.value })}><option value="">Select…</option>{semesters.map((s) => <option key={s.id} value={s.id}>{s.course_name} · Semester {s.number} · {s.academic_year_name}</option>)}</select></label>
-        <label className="text-sm font-medium text-slate-700">Window starts<input type="date" className="field mt-1.5" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></label>
-        <label className="text-sm font-medium text-slate-700">Window ends<input type="date" className="field mt-1.5" min={form.start_date} value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
-        <label className="flex items-center gap-2 text-sm text-slate-700 lg:col-span-2"><input type="checkbox" checked={form.avoid_class_clashes} onChange={(e) => setForm({ ...form, avoid_class_clashes: e.target.checked })} />Avoid clashes with regular classes (turn off for a dedicated exam week)</label>
-        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.replace_existing} onChange={(e) => setForm({ ...form, replace_existing: e.target.checked })} />Replace existing exams</label>
+        <label className="text-sm font-medium text-slate-700 lg:col-span-2">Semester<select className="field mt-1.5" value={form.semester} onChange={(e) => updateForm({ semester: e.target.value })}><option value="">Select…</option>{semesters.map((s) => <option key={s.id} value={s.id}>{s.course_name} · Semester {s.number} · {s.academic_year_name}</option>)}</select></label>
+        <label className="text-sm font-medium text-slate-700">Window starts<input type="date" className="field mt-1.5" value={form.start_date} onChange={(e) => updateForm({ start_date: e.target.value })} /></label>
+        <label className="text-sm font-medium text-slate-700">Window ends<input type="date" className="field mt-1.5" min={form.start_date} value={form.end_date} onChange={(e) => updateForm({ end_date: e.target.value })} /></label>
+        <label className="flex items-center gap-2 text-sm text-slate-700 lg:col-span-2"><input type="checkbox" checked={form.avoid_class_clashes} onChange={(e) => updateForm({ avoid_class_clashes: e.target.checked })} />Avoid clashes with regular classes (turn off for a dedicated exam week)</label>
+        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={form.replace_existing} onChange={(e) => updateForm({ replace_existing: e.target.checked })} />Replace existing exams</label>
         <div className="flex gap-2 lg:justify-end"><button disabled={busy || !form.semester || !form.start_date || !form.end_date} onClick={() => run(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-blue-200 px-4 text-sm font-semibold text-blue-700 disabled:opacity-50">{busy ? <Loader2 className="animate-spin" size={16} /> : <Play size={16} />}Preview</button>
           <button disabled={busy || !result?.preview || !result.scheduled.length} onClick={() => run(false)} className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-50">Publish</button></div>
       </section>
@@ -176,7 +178,7 @@ function Exams() {
 
 function Audit() {
   const [rows, setRows] = useState([]);
-  useEffect(() => { api.get("/audit-logs/").then(({ data }) => setRows(items(data))).catch(() => {}); }, []);
+  useEffect(() => { api.getAll("/audit-logs/").then(setRows).catch(() => {}); }, []);
   return <section className="panel"><h2 className="text-base font-semibold">Recent changes</h2><div className="mt-3 divide-y divide-slate-100">{rows.length === 0 && <p className="py-4 text-sm text-slate-500">No activity recorded yet.</p>}{rows.map((row) => <p key={row.id} className="py-2 text-sm"><span className="font-medium">{row.actor_name}</span> · {row.action} <span className="text-slate-500">{row.entity} {row.entity_id}</span><span className="float-right text-xs text-slate-400">{new Date(row.created_at).toLocaleString()}</span></p>)}</div></section>;
 }
 

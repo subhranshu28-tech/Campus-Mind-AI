@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: smart_campus
+          POSTGRES_USER: campus
+          POSTGRES_PASSWORD: campus
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U campus -d smart_campus"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DJANGO_DEBUG: "false"
+      DJANGO_SECRET_KEY: "ci-only-secret-key-that-is-long-enough-to-pass-the-production-check-1234567890"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
+      DATABASE_URL: "postgres://campus:campus@localhost:5432/smart_campus"
+      PASSWORD_RESET_URL: "http://localhost:5173/password-reset"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Critical lint
+        run: ruff check --select E9,F63,F7,F82 backend manage.py
+      - name: Django system checks
+        run: python manage.py check --deploy
+      - name: Migration drift
+        run: python manage.py makemigrations --check --dry-run
+      - name: Tests with coverage
+        run: coverage run manage.py test apps.accounts apps.operations && coverage report
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Frontend tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Dependency audit
+        run: npm audit --audit-level=high

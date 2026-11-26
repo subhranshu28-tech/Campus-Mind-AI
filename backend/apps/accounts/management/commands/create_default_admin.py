@@ -1,7 +1,8 @@
 import os
 import secrets
 
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 
 from apps.accounts.models import College, User
 
@@ -9,13 +10,11 @@ DEFAULT_ACCOUNTS = [
     {
         "username": "admin",
         "env_password": "DEFAULT_ADMIN_PASSWORD",
-        "fallback_password": "ChangeMe!Admin123",
         "email": "admin@smartcampus.local",
     },
     {
         "username": "superadmin",
         "env_password": "DEFAULT_SUPERADMIN_PASSWORD",
-        "fallback_password": "ChangeMe!SuperAdmin123",
         "email": "superadmin@smartcampus.local",
     },
 ]
@@ -28,7 +27,19 @@ class Command(BaseCommand):
         "first login, and never run this against a public-facing production database."
     )
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Allow creating default accounts while DJANGO_DEBUG is false.",
+        )
+
     def handle(self, *args, **options):
+        if not settings.DEBUG and not options["force"]:
+            raise CommandError(
+                "Refusing to create default accounts with DEBUG disabled. "
+                "Use --force only for a deliberate bootstrap, then rotate the passwords."
+            )
         college, _ = College.objects.get_or_create(code="LEGACY", defaults={"name": "Legacy Campus", "slug": "legacy-campus"})
         for account in DEFAULT_ACCOUNTS:
             username = account["username"]

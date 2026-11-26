@@ -28,6 +28,28 @@ services:
           type: web
           name: smart-campus-erp-frontend
           property: host
+      - key: DJANGO_TIME_ZONE
+        value: Asia/Kolkata
+      - key: PASSWORD_RESET_URL
+        sync: false
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: EMAIL_USE_TLS
+        value: "true"
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+      # Optional Redis for shared throttling across workers. Without it each
+      # worker keeps its own counters. Render Key Value (or any Redis URL) works.
+      - key: REDIS_URL
+        sync: false
 
   - type: web
     name: smart-campus-erp-frontend

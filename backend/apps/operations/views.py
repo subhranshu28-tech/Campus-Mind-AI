@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.campus.models import Semester, TimetableEntry
+from apps.campus.models import Classroom, Faculty, Section, Semester, TimetableEntry
 from apps.accounts.tenancy import scope_queryset
 
 from . import services
@@ -199,7 +199,7 @@ class TimetableExportView(APIView):
             object_id = int(request.query_params.get("id", ""))
         except ValueError:
             raise ValidationError({"id": "Provide the numeric id to export."})
-        model_map = {"section": __import__("apps.campus.models", fromlist=["Section"]).Section, "faculty": __import__("apps.campus.models", fromlist=["Faculty"]).Faculty, "room": __import__("apps.campus.models", fromlist=["Classroom"]).Classroom}
+        model_map = {"section": Section, "faculty": Faculty, "room": Classroom}
         obj = scope_queryset(model_map[scope].objects.all(), request.user).filter(pk=object_id).first()
         if obj is None:
             raise ValidationError({"id": "Record not found in your college."})

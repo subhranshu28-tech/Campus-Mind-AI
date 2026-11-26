@@ -20,9 +20,11 @@ EXAM_SESSIONS = [(1, 3), (5, 3)]  # morning (P1-3) and afternoon (P5-7)
 
 
 # ------------------------------------------------------------------ audit + notifications
-def log(actor, action, entity, entity_id="", **detail):
+def log(actor, action, entity, entity_id="", college_id=None, **detail):
+    authenticated = getattr(actor, "is_authenticated", False)
     AuditLog.objects.create(
-        actor=actor if getattr(actor, "is_authenticated", False) else None,
+        actor=actor if authenticated else None,
+        college_id=college_id or (getattr(actor, "college_id", None) if authenticated else None),
         action=action, entity=entity, entity_id=str(entity_id), detail=detail,
     )
 
@@ -259,8 +261,12 @@ def auto_schedule_exams(semester, start, end, holidays, avoid_class_clashes, rep
     if replace_existing:
         ExamSchedule.objects.filter(section__semester=semester).delete()
     section_ids = {task.section_id for task in tasks.values()}
+    college_id = semester.course.department.college_id
     blocked_sections, blocked_rooms, busy_faculty = set(), set(), set()
-    existing = ExamSchedule.objects.filter(date__range=(start, end))
+    existing = ExamSchedule.objects.filter(
+        date__range=(start, end),
+        section__semester__course__department__college_id=college_id,
+    )
     for exam in existing:
         for index, session in enumerate(EXAM_SESSIONS):
             if _session_periods(session) & set(range(exam.start_period, exam.start_period + exam.duration_periods)):
@@ -271,7 +277,9 @@ def auto_schedule_exams(semester, start, end, holidays, avoid_class_clashes, rep
                     busy_faculty.add((exam.invigilator_id, exam.date, index))
     if avoid_class_clashes:
         class_slots = defaultdict(list)
-        for row in TimetableEntry.objects.all():
+        for row in TimetableEntry.objects.filter(
+            section__semester__course__department__college_id=college_id
+        ):
             class_slots[row.weekday].append(row)
         for day in dates:
             for index, session in enumerate(EXAM_SESSIONS):
@@ -282,7 +290,10 @@ def auto_schedule_exams(semester, start, end, holidays, avoid_class_clashes, rep
                         busy_faculty.add((row.faculty_id, day, index))
                         if row.section_id in section_ids:
                             blocked_sections.add((row.section_id, day, index))
-    for cover in Substitution.objects.filter(status="assigned", date__range=(start, end)):
+    for cover in Substitution.objects.filter(
+        status="assigned", date__range=(start, end),
+        section__semester__course__department__college_id=college_id,
+    ):
         for index, session in enumerate(EXAM_SESSIONS):
             if cover.period in _session_periods(session):
                 busy_faculty.add((cover.substitute_id, cover.date, index))
@@ -296,20 +307,51 @@ def auto_schedule_exams(semester, start, end, holidays, avoid_class_clashes, rep
         {"id": f.id, "department_id": f.department_id}
         for f in Faculty.objects.filter(department__college_id=college_id)
     ]
-    on_leave = {(l.faculty_id, l.start_date, l.end_date) for l in FacultyLeave.objects.filter(status="approved")}
+    on_leave = {
+        (l.faculty_id, l.start_date, l.end_date)
+        for l in FacultyLeave.objects.filter(status="approved", faculty__department__college_id=college_id)
+    }
     for faculty_id, left, right in on_leave:
         for day in dates:
             if left <= day <= right:
                 busy_faculty.update((faculty_id, day, index) for index in range(len(EXAM_SESSIONS)))
+    # Honour explicit faculty availability when choosing invigilators. A record
+    # with is_available=True acts as an allow-list; otherwise False blocks slots.
+    availability = defaultdict(lambda: {"allowed": set(), "blocked": set()})
+    for row in FacultyAvailability.objects.filter(faculty__department__college_id=college_id):
+        key = "allowed" if row.is_available else "blocked"
+        availability[row.faculty_id][key].add((row.weekday, row.period))
+    for day in dates:
+        weekday = day.weekday()
+        for index, session in enumerate(EXAM_SESSIONS):
+            required = _session_periods(session)
+            for person in invigilator_pool:
+                slots = availability.get(person["id"])
+                if not slots:
+                    continue
+                if slots["allowed"]:
+                    usable = {p for (w, p) in slots["allowed"] if w == weekday}
+                    usable -= {p for (w, p) in slots["blocked"] if w == weekday}
+                else:
+                    usable = set(range(1, 9)) - {p for (w, p) in slots["blocked"] if w == weekday}
+                if not required.issubset(usable):
+                    busy_faculty.add((person["id"], day, index))
     invigilators = engine.assign_invigilators(
         [(task.key, day, index) for task, day, index, _ in plan.assignments], invigilator_pool,
         busy_faculty, {key: teachers[key] for key in tasks},
     )
 
     room_by_id = {room.id: room for room in rooms}
-    subjects = {s.id: s for s in Subject.objects.filter(id__in={t.subject_id for t in tasks.values()})}
+    subjects = {
+        s.id: s for s in Subject.objects.filter(
+            id__in={t.subject_id for t in tasks.values()},
+            course__department__college_id=college_id,
+        )
+    }
     sections = {a.section_id: a.section for a in assignments}
-    faculty_by_id = {f.id: f for f in Faculty.objects.select_related("user")}
+    faculty_by_id = {
+        f.id: f for f in Faculty.objects.filter(department__college_id=college_id).select_related("user")
+    }
     rows, created = [], []
     for task, day, index, room_id in plan.assignments:
         start_period, duration = EXAM_SESSIONS[index]

@@ -20,8 +20,8 @@ export default function SubjectNotes({ canUpload = false, user, kind = "notes" }
   async function loadNotes() {
     setError("");
     try {
-      const { data } = await api.get(endpoint);
-      setNotes(data.results || data);
+      const data = await api.getAll(endpoint);
+      setNotes(data);
     } catch (requestError) {
       setError(requestError.response?.data?.detail || "Subject notes could not be loaded.");
     } finally {
@@ -33,8 +33,8 @@ export default function SubjectNotes({ canUpload = false, user, kind = "notes" }
     let active = true;
     loadNotes();
     if (canUpload) {
-      api.get(`${endpoint}subjects/`)
-        .then(({ data }) => { if (active) setSubjects(data); })
+      api.getAll(`${endpoint}subjects/`)
+        .then((data) => { if (active) setSubjects(data); })
         .catch((requestError) => {
           if (active) setError(requestError.response?.data?.detail || "Your teaching subjects could not be loaded.");
         });

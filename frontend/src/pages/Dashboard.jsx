@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Activity, Bell, BookOpen, Building2, CalendarDays, ChevronDown, GraduationCap, LayoutDashboard, LogOut, Menu, Search, Users, X, Sparkles, ClipboardList, Moon, Sun, FileText } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +30,7 @@ const navigation = [
   { label: "Operations center", icon: Activity, module: "operations" },
   { label: "Subject notes", icon: FileText, module: "subject-notes" },
   { label: "Previous question papers", icon: ClipboardList, module: "question-papers" },
+  { label: "AI assistant", icon: Sparkles, module: "ai" },
 ];
 const studentNavigation = [
   { label: "My dashboard", icon: LayoutDashboard, module: "overview" },
@@ -47,7 +49,9 @@ export default function Dashboard() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [activeModule, setActiveModule] = useState("overview");
+  const [search, setSearch] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("campus.theme") || "light");
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -80,6 +84,16 @@ export default function Dashboard() {
   const isStudent = user?.role === "student";
   const visibleNavigation = isStudent ? studentNavigation : canViewCampusRecords ? navigation : navigation.slice(0, 1);
   const activeTitle = [...navigation, ...studentNavigation].find((item) => item.module === activeModule)?.label || "Overview";
+  const searchResults = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return [];
+    return visibleNavigation.filter((item) => item.label.toLowerCase().includes(term)).slice(0, 8);
+  }, [search, visibleNavigation]);
+  const openModule = (module) => {
+    if (module === "ai") navigate("/ai");
+    else setActiveModule(module);
+    setSearch("");
+  };
 
   return (
     <div className="app-shell min-h-screen text-slate-900">
@@ -88,16 +102,16 @@ export default function Dashboard() {
       {mobileOpen && <button aria-label="Close navigation" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-30 bg-slate-950/40 backdrop-blur-sm lg:hidden" />}
       <aside className={`glass-sidebar fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col transition-transform duration-300 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="sidebar-brand flex h-[72px] items-center justify-between border-b px-5"><div className="flex items-center gap-3"><span className="sidebar-brand-mark grid h-9 w-9 place-items-center rounded-xl text-white"><GraduationCap size={20} /></span><span className="text-sm font-bold tracking-tight">CampusMind AI<span className="block text-[9px] font-medium tracking-[.2em] text-slate-400">CAMPUS WORKSPACE</span></span></div><button aria-label="Close navigation" onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-slate-300 transition hover:bg-white/10 hover:text-white lg:hidden"><X size={18} /></button></div>
-        <div className="flex-1 overflow-y-auto px-3 pt-6"><p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[.2em] text-slate-400">Workspace</p>{visibleNavigation.map(({ label, icon: Icon, module }) => <button key={module} onClick={() => { setActiveModule(module); setMobileOpen(false); }} className={`sidebar-nav-item ${activeModule === module ? "sidebar-nav-item--active" : ""} mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm`}><Icon size={17} />{label}</button>)}</div>
+        <div className="flex-1 overflow-y-auto px-3 pt-6"><p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[.2em] text-slate-400">Workspace</p>{visibleNavigation.map(({ label, icon: Icon, module }) => <button key={module} onClick={() => { openModule(module); setMobileOpen(false); }} className={`sidebar-nav-item ${activeModule === module ? "sidebar-nav-item--active" : ""} mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm`}><Icon size={17} />{label}</button>)}</div>
         <div className="sidebar-account mt-auto p-4"><div className="sidebar-account-card flex items-center gap-3 rounded-xl p-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-400/20 text-xs font-semibold text-blue-100 ring-1 ring-white/15">{initials}</span><div className="min-w-0"><p className="truncate text-sm font-medium text-white">{displayName}</p><p className="truncate text-xs capitalize text-slate-400">{roleLabel}</p></div></div></div>
       </aside>
       <div className="lg:pl-[248px]">
         <header className="glass-topbar sticky top-3 z-20 mx-3 flex h-[64px] items-center justify-between rounded-2xl px-3 sm:mx-5 sm:px-5 lg:mx-7">
-          <div className="flex items-center gap-3"><button aria-label="Open navigation" onClick={() => setMobileOpen(true)} className="rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 lg:hidden"><Menu size={19} /></button><div className="relative hidden sm:block"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input className="glass-search h-10 w-64 rounded-xl pl-9 pr-3 text-sm outline-none placeholder:text-slate-400" placeholder="Search your campus…" /></div><p className="text-sm font-semibold sm:hidden">{activeTitle}</p></div>
+          <div className="flex items-center gap-3"><button aria-label="Open navigation" onClick={() => setMobileOpen(true)} className="rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 lg:hidden"><Menu size={19} /></button><div className="relative hidden sm:block"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && searchResults[0]) openModule(searchResults[0].module); if (event.key === "Escape") setSearch(""); }} aria-label="Search workspace sections" className="glass-search h-10 w-64 rounded-xl pl-9 pr-3 text-sm outline-none placeholder:text-slate-400" placeholder="Search your campus…" />{search.trim() && <div role="listbox" className="absolute left-0 right-0 top-12 z-50 max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">{searchResults.length === 0 ? <p className="px-3 py-2 text-sm text-slate-500">No matching section</p> : searchResults.map(({ label, icon: Icon, module }) => <button key={module} role="option" onClick={() => openModule(module)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"><Icon size={15} />{label}</button>)}</div>}</div><p className="text-sm font-semibold sm:hidden">{activeTitle}</p></div>
           <div className="flex items-center gap-2 sm:gap-3"><button aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} onClick={() => setTheme((current) => current === "light" ? "dark" : "light")} className="rounded-xl border border-slate-200/70 bg-white/40 p-2 text-slate-600 transition hover:bg-white/75 hover:text-blue-700"><span className="block transition-transform duration-300 hover:rotate-12">{theme === "light" ? <Moon size={17} /> : <Sun size={17} />}</span></button><NotificationBell /><div className="relative"><button onClick={() => setProfileOpen(!profileOpen)} className="flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-slate-100/70"><span className="grid h-8 w-8 place-items-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">{initials}</span><span className="hidden max-w-32 truncate text-sm font-medium sm:block">{displayName}</span><ChevronDown size={14} className="hidden text-slate-400 sm:block" /></button>{profileOpen && <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-lg"><p className="truncate px-2 py-2 text-xs text-slate-500">{user?.email}</p><button onClick={logout} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"><LogOut size={15} />Sign out</button></div>}</div></div>
         </header>
         <main className="relative mx-auto max-w-[1500px] p-4 pt-7 sm:p-7 sm:pt-9">
-          {activeModule === "subject-notes" || activeModule === "question-papers" ? <SubjectNotes kind={activeModule === "question-papers" ? "papers" : "notes"} user={user} canUpload={!isStudent && (user?.role === "faculty" || canManage)} /> : isStudent ? <StudentPortal /> : activeModule === "operations" ? <OperationsCenter canManage={canManage} /> : activeModule === "timetable" ? <TimetableManager /> : activeModule !== "overview" ? <ModuleManager key={activeModule} moduleKey={activeModule} canManage={canManage} /> : <>
+          {activeModule === "subject-notes" || activeModule === "question-papers" ? <SubjectNotes kind={activeModule === "question-papers" ? "papers" : "notes"} user={user} canUpload={!isStudent && (user?.role === "faculty" || canManage)} /> : isStudent ? <StudentPortal /> : activeModule === "operations" ? <OperationsCenter canManage={canManage} /> : activeModule === "timetable" ? <TimetableManager canManage={canManage} /> : activeModule !== "overview" ? <ModuleManager key={activeModule} moduleKey={activeModule} canManage={canManage} /> : <>
           <div className="content-enter mb-7 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-medium text-blue-700">Campus operations</p><h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-[28px]">Good to see you, {displayName.split(" ")[0]}</h1><p className="mt-1 text-sm text-slate-500">Here’s your campus at a glance.</p></div><div className="glass-badge flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-slate-600"><CalendarDays size={15} className="text-blue-600" />Live overview</div></div>
           {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

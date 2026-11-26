@@ -220,8 +220,8 @@ export default function ModuleManager({ moduleKey, canManage }) {
   useEffect(() => {
     let active = true;
     Promise.all(relationEndpoints.map(async (endpoint) => {
-      const { data } = await api.get(`/${endpoint}/`);
-      return [endpoint, Array.isArray(data) ? data : data.results || []];
+      const data = await api.getAll(`/${endpoint}/`);
+      return [endpoint, data];
     })).then((entries) => {
       if (active) setRelated(Object.fromEntries(entries));
     }).catch((requestError) => {

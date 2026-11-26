@@ -15,10 +15,15 @@ def env_bool(name, default=False):
     return os.getenv(name, str(default)).lower() in {"1", "true", "yes"}
 
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-development-key-change-before-deploy")
-DEBUG = env_bool("DJANGO_DEBUG", not bool(os.getenv("RENDER")))
-if not DEBUG and SECRET_KEY == "unsafe-development-key-change-before-deploy":
+DEV_SECRET_KEY = "unsafe-development-key-change-before-deploy"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY") or DEV_SECRET_KEY
+# Secure by default everywhere (Vercel, Railway, Fly, a VPS, plain gunicorn).
+# Local development must opt in explicitly with DJANGO_DEBUG=true.
+DEBUG = env_bool("DJANGO_DEBUG", False)
+if not DEBUG and SECRET_KEY == DEV_SECRET_KEY:
     raise ImproperlyConfigured("DJANGO_SECRET_KEY must be configured when DEBUG is disabled.")
+if not DEBUG and len(SECRET_KEY) < 50:
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be at least 50 characters in production.")
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -41,6 +46,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     "corsheaders",
     "drf_spectacular",
@@ -108,11 +114,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+TIME_ZONE = os.getenv("DJANGO_TIME_ZONE", "UTC")
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
@@ -124,12 +132,22 @@ if os.getenv("AWS_STORAGE_BUCKET_NAME"):
     AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
     AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "ap-south-1")
     AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL") or None
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN", "").strip() or None
     AWS_DEFAULT_ACL = None
     AWS_QUERYSTRING_AUTH = env_bool("AWS_QUERYSTRING_AUTH", True)
     AWS_S3_FILE_OVERWRITE = False
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
-MEDIA_ROOT = BASE_DIR / "media"
+    if AWS_S3_CUSTOM_DOMAIN:
+        MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Shared cache for DRF throttling and short-lived app data. Without REDIS_URL
+# each Gunicorn worker keeps its own counters, so limits are per-process.
+REDIS_URL = os.getenv("REDIS_URL", "").strip()
+if REDIS_URL:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}}
+else:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "campusmind-local"}}
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
 SESSION_COOKIE_SECURE = not DEBUG
@@ -179,7 +197,8 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
 }
 SPECTACULAR_SETTINGS = {
     "TITLE": "CampusMind AI API",
@@ -214,10 +233,16 @@ CSRF_TRUSTED_ORIGINS = configured_origins("CSRF_TRUSTED_ORIGINS")
 if frontend_origin and frontend_origin not in CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS.append(frontend_origin)
 
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+_default_email_backend = (
+    "django.core.mail.backends.console.EmailBackend"
+    if DEBUG
+    else "django.core.mail.backends.smtp.EmailBackend"
+)
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", _default_email_backend)
 EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "CampusMind AI <no-reply@example.com>")
+PASSWORD_RESET_URL = os.getenv("PASSWORD_RESET_URL", "")

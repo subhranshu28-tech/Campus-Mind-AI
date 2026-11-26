@@ -4,15 +4,16 @@ An actively evolving campus management platform. This initial foundation impleme
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.11–3.13 (OR-Tools wheels are not yet available for 3.14)
 - Node.js 20+
 - PostgreSQL 15+ (or Docker Desktop)
+- Optional: Redis for shared throttling across workers
 
 ## Local setup
 
 From the project root in VS Code:
 
-1. Copy `.env.example` to `.env`. Set a long random `DJANGO_SECRET_KEY` and a private `POSTGRES_PASSWORD`.
+1. Copy `.env.example` to `.env`. Set a long random `DJANGO_SECRET_KEY` and a private `POSTGRES_PASSWORD`. Local development must keep `DJANGO_DEBUG=true`; production now defaults to `DEBUG=False` and refuses to start without a 50+ character secret.
 2. Start PostgreSQL, for example with `docker compose up -d db`.
 3. Configure and install the backend:
 
@@ -49,11 +50,23 @@ From the project root in VS Code:
 
    Open the Vite URL (normally `http://localhost:5173`) and sign in using a Django user account.
 
+### Docker quick start
+
+With `.env` in place:
+
+```bash
+docker compose up --build
+```
+
+This starts PostgreSQL, Redis, the Django API (`:8000`), and an nginx-served React build (`:8080`) with SPA fallback and API/media proxying. Migrations and `collectstatic` run automatically at container start.
+
 ## API
 
-- JWT sign-in: `POST /api/auth/token/` with `{"username":"…","password":"…"}`
-- Refresh: `POST /api/auth/token/refresh/`
+- JWT sign-in: `POST /api/auth/token/` with `{"username":"…","password":"…"}` (rejects users whose college workspace is inactive)
+- Refresh: `POST /api/auth/token/refresh/` (rotated tokens are blacklisted)
+- Logout: `POST /api/auth/logout/` with `{"refresh":"…"}` revokes the refresh token server-side
 - Current profile: `GET /api/auth/me/`
+- Health/readiness: `GET /healthz/` checks the database and returns 503 when it is unreachable
 - Dashboard data: `GET /api/dashboard/summary/`
 - Student workspace: `GET /api/student/portal/` returns only the signed-in student's profile, attendance history and rate, section subjects, weekly timetable, and upcoming exams.
 - Subject notes: `/api/subject-notes/` lets faculty upload PDF notes for assigned subjects; students can list and download notes for their own section's assigned subjects. Faculty can list, upload, download, and delete their subject notes. Local uploads are stored under `backend/media/subject-notes/`.
@@ -93,11 +106,15 @@ The Blueprint is prepared locally but has not been deployed. Render requires thi
 
 ## Tests
 
-```powershell
-python manage.py test apps.accounts
+```bash
+python manage.py test apps
 ```
 
-The API tests cover JWT login/profile, authentication and role permissions, department CRUD, student/faculty account creation and password hashing, student-only portal data, subject-note and past-paper access, PDF validation, year validation, section privacy, academic relationships, attendance duplication, academic-year validation, dashboard metrics, OR-Tools timetable generation against constrained availability, laboratory capacity errors, substitution qualification/availability, and overlapping exam prevention.
+Or `python manage.py test apps.accounts apps.operations` for the API suites only. The engine tests are pure Python and need no database, but must be run through `manage.py` (or with `PYTHONPATH=backend`); `python -m unittest apps.operations.tests_engine` from the repository root cannot import `apps`.
+
+On Python 3.14 (no OR-Tools wheel), the timetable optimiser test requires a working CP-SAT installation; run the suite on Python 3.11–3.13 (CI uses 3.13). `seed_demo` does not depend on the optimiser and works everywhere.
+
+The API tests cover JWT login/profile, logout token blacklisting, inactive-college login rejection, password reset (success, invalid token, weak password), health check, authentication and role permissions, two-college tenant isolation (lists, related writes, exam conflicts, audit logs, hash chain), department CRUD, student/faculty account creation and password hashing, student-only portal data, subject-note and past-paper access, PDF validation, year validation, section privacy, academic relationships, attendance duplication, academic-year validation, dashboard metrics, OR-Tools timetable generation against constrained availability, laboratory capacity errors, substitution qualification/availability, leave approval, exam auto-scheduling, analytics/export, and overlapping exam prevention. Frontend smoke tests cover paginated API aggregation and the error boundary.
 
 ## Scheduling setup and constraints
 
@@ -115,7 +132,9 @@ The current timetable model is Monday–Friday, eight periods per day. Exam peri
 
 The product request covers a multi-module ERP and production deployment, which cannot be represented honestly as complete by these phases alone. Implemented now: custom role-bearing accounts, JWT login/refresh, role-checked CRUD APIs and responsive screens for departments, student/faculty profiles and accounts, academic years/courses/semesters/sections/subjects, daily attendance recording/correction, rooms and laboratories, weekly faculty availability, teaching assignments and workloads, a persisted OR-Tools timetable optimizer, subject-qualified faculty substitute suggestions, exam schedule CRUD and conflict checking, database-backed dashboard metrics, API schema/docs, PostgreSQL/Docker database configuration, Render deployment configuration (not yet deployed), and API tests.
 
-Not yet implemented: fees, library, hostel, transport, placements, assignments, notices and events as complete ERP workflows; fine-grained department-level object policies; a full immutable audit trail for every data mutation; a grounded academic assistant; frontend automated tests; configurable school-specific time periods; and production deployment hardening. Multi-college tenant provisioning and application-level tenant scoping are now implemented, but still require staging migration and cross-tenant verification.
+Implemented in this pass: secure-by-default settings, JWT logout revocation, college-aware login, health/readiness probe, college-scoped audit logs with append-only admin, two-college regression tests, cache/throttle configuration, CI workflow, Ruff/coverage configuration, Docker/Compose stack, security/contribution docs, and frontend session/UX hardening.
+
+Not yet implemented: fees, library, hostel, transport, placements, assignments, notices and events as complete ERP workflows; fine-grained department-level object policies; an immutable audit trail for every data mutation (the audit log is append-only in Django admin but is not chain-sealed); a grounded academic assistant; frontend automated tests; configurable school-specific time periods; and production deployment verification. Multi-college tenant provisioning and application-level tenant scoping are implemented and covered by tests, but still require a staging migration rehearsal before public production use.
 
 ## Problem statement coverage (intelligent academic scheduling)
 
@@ -130,19 +149,20 @@ Not yet implemented: fees, library, hostel, transport, placements, assignments, 
 
 UI: **Operations center** in the sidebar (analytics, leave and substitutes, exam planner, audit trail) and a notification bell in the header.
 
-Demo data: `python manage.py seed_demo` builds a small college with a generated timetable (accounts use a random password printed once, or pass `--password`).
-
-Tests: `python -m unittest apps.operations.tests_engine` (engine, no database) and `python manage.py test apps.operations apps.accounts` (API).
+Demo data: `python manage.py seed_demo` builds a small college with a deterministic, conflict-free timetable that does not require OR-Tools (accounts use a random password printed once, or pass `--password`).
 
 ### Current operating limits
 Multi-college workspaces are implemented with application-level tenant scoping; staging migration and cross-tenant verification are still required before public production use. Scheduling currently uses Monday-Friday with eight periods and exam sessions fixed at P1-3 / P5-7. Notifications are in-app only (no email/SMS), and frontend automated tests are not yet included. The OR-Tools solver is large and long-running: on Vercel it may exceed function size/time limits, so host the API on Render/Railway/Fly (or move the solver to a background worker) and keep Vercel for the React frontend; use hosted PostgreSQL and persistent object storage for uploaded files.
 
-## Security notes
+## Configuration and security notes
 
+- `DEBUG` now defaults to `False`; set `DJANGO_DEBUG=true` explicitly for local work. In production, the app refuses to start without a `DJANGO_SECRET_KEY` of at least 50 characters.
 - Passwords use Django's configured password hashers; no plaintext password field is exposed through the API.
-- JWT access tokens are short-lived. The current browser client keeps tokens in `sessionStorage`; production deployments should evaluate an HttpOnly-cookie design, HTTPS, CSP, secure headers, secret rotation, rate limiting, and explicit deployment origins.
-- The Render Blueprint sets `DJANGO_DEBUG=false`, generates a secret key, restricts CORS to the deployed frontend host, and enables HTTPS-related protections.
-- The default development secret is unsafe and must never be used in a deployed environment.
+- JWT access tokens are short-lived; rotation blacklists the old refresh token and `POST /api/auth/logout/` revokes the active one. The browser client keeps tokens in `sessionStorage` and clears them on a failed refresh; production deployments should evaluate an HttpOnly-cookie design, HTTPS, CSP, secure headers, and secret rotation.
+- Set `REDIS_URL` to share throttle counters across workers (the fallback is per-process memory). Set `PASSWORD_RESET_URL` to the frontend reset page, and configure the standard `EMAIL_*` variables plus `DEFAULT_FROM_EMAIL` to actually deliver reset links. `DJANGO_TIME_ZONE` defaults to `UTC` (the Docker/Render configuration sets `Asia/Kolkata`).
+- `vercel.json` now builds and serves only the React SPA. Host the API on Render/Railway/Fly with persistent PostgreSQL and object storage; the OR-Tools solver is unsuitable for a short-lived serverless function.
+- The Render Blueprint sets `DJANGO_DEBUG=false`, generates a secret key, restricts CORS to the deployed frontend host, and enables HTTPS-related protections. Free plans still have the database expiry and ephemeral-disk limits noted above.
+- See [SECURITY.md](SECURITY.md) for the deployment checklist and vulnerability reporting, and [CONTRIBUTING.md](CONTRIBUTING.md) for the local checks CI runs.
 
 ## Multi-college SaaS tenancy
 

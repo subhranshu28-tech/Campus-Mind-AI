@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
-from apps.accounts.tenancy import scope_queryset, tenant_id_for
+from apps.accounts.tenancy import TENANT_LOOKUPS, scope_queryset, tenant_id_for
 
 from .models import (
     AcademicYear,
@@ -83,7 +83,7 @@ class CampusModelViewSet(viewsets.ModelViewSet):
                 if related_model.__name__ == "User":
                     field.queryset = queryset.filter(college_id=college_id)
                 else:
-                    lookup = __import__("apps.accounts.tenancy", fromlist=["TENANT_LOOKUPS"]).TENANT_LOOKUPS.get(related_model.__name__)
+                    lookup = TENANT_LOOKUPS.get(related_model.__name__)
                     if lookup:
                         field.queryset = queryset.filter(**{lookup: college_id})
         return serializer
@@ -115,7 +115,7 @@ class CampusModelViewSet(viewsets.ModelViewSet):
 
 
 class DepartmentViewSet(CampusModelViewSet):
-    queryset = Department.objects.select_related("head").annotate(student_count=Count("students"))
+    queryset = Department.objects.select_related("head").annotate(student_count=Count("students")).order_by("name")
     serializer_class = DepartmentSerializer
     permission_classes = [IsAuthenticated, CampusStaffCanManage]
     search_fields = ["name", "code"]
@@ -205,7 +205,7 @@ class SubjectPDFResourceViewSet(viewsets.ModelViewSet):
                     if related_model.__name__ == "User":
                         field.queryset = queryset.filter(college_id=college_id)
                     else:
-                        lookup = __import__("apps.accounts.tenancy", fromlist=["TENANT_LOOKUPS"]).TENANT_LOOKUPS.get(related_model.__name__)
+                        lookup = TENANT_LOOKUPS.get(related_model.__name__)
                         if lookup:
                             field.queryset = queryset.filter(**{lookup: college_id})
         return serializer

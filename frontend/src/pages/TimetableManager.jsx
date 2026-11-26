@@ -9,7 +9,7 @@ function messageFrom(error) {
   return Array.isArray(detail) ? detail.join(", ") : detail || "The request failed. Review the timetable setup and try again.";
 }
 
-export default function TimetableManager() {
+export default function TimetableManager({ canManage = false }) {
   const [semesters, setSemesters] = useState([]);
   const [sections, setSections] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -24,13 +24,9 @@ export default function TimetableManager() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([api.get("/semesters/"), api.get("/sections/")])
-      .then(([semesterResponse, sectionResponse]) => {
+    Promise.all([api.getAll("/semesters/"), api.getAll("/sections/")])
+      .then(([semesterRows, sectionRows]) => {
         if (!active) return;
-        const semesterRows = Array.isArray(semesterResponse.data)
-          ? semesterResponse.data : semesterResponse.data.results || [];
-        const sectionRows = Array.isArray(sectionResponse.data)
-          ? sectionResponse.data : sectionResponse.data.results || [];
         setSemesters(semesterRows);
         setSections(sectionRows);
         setSemesterId((current) => current || String(semesterRows[0]?.id || ""));
@@ -50,9 +46,9 @@ export default function TimetableManager() {
       setEntries([]);
       return () => { active = false; };
     }
-    api.get("/timetable/entries/", { params: { "section__semester": semesterId } })
-      .then(({ data }) => {
-        if (active) setEntries(Array.isArray(data) ? data : data.results || []);
+    api.getAll("/timetable/entries/", { params: { "section__semester": semesterId } })
+      .then((rows) => {
+        if (active) setEntries(rows);
       })
       .catch((requestError) => {
         if (active) setError(messageFrom(requestError));
@@ -71,6 +67,10 @@ export default function TimetableManager() {
   const activeSemester = semesters.find((semester) => String(semester.id) === String(semesterId));
 
   async function generate() {
+    if (!canManage) {
+      setError("Only campus managers can generate timetables.");
+      return;
+    }
     if (!semesterId) {
       setError("Create an academic year, course, and semester before generating a timetable.");
       return;
@@ -117,7 +117,7 @@ export default function TimetableManager() {
     <section className="content-enter">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div><p className="text-sm font-medium text-blue-700">Academic operations</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">AI smart timetable</h1><p className="mt-1 text-sm text-slate-500">Build a conflict-free weekly schedule around teaching loads, faculty availability, room capacity, and lab requirements.</p></div>
-        <button onClick={generate} disabled={generating || loading || !semesterId} className="glass-button inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"><Sparkles size={16} />{generating ? "Optimizing…" : "Generate timetable"}</button>
+        {canManage && <button onClick={generate} disabled={generating || loading || !semesterId} className="glass-button inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"><Sparkles size={16} />{generating ? "Optimizing…" : "Generate timetable"}</button>}
       </div>
 
       {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}

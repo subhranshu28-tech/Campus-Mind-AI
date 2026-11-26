@@ -5,6 +5,8 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError as ApiValidationError
 from rest_framework import serializers
 
+from apps.accounts.tenancy import tenant_id_for
+
 from .models import (
     AcademicYear,
     AttendanceRecord,
@@ -442,6 +444,15 @@ class ExamScheduleSerializer(serializers.ModelSerializer):
         start = attrs.get("start_period", getattr(schedule, "start_period", None))
         duration = attrs.get("duration_periods", getattr(schedule, "duration_periods", 1))
         errors = {}
+        college_id = section.semester.course.department.college_id if section else None
+        # Never trust ids from the request: every related row must be in the
+        # same college as the section. This blocks cross-tenant writes even if
+        # a client guesses valid primary keys.
+        for field_name, obj in (
+            ("section", section), ("subject", subject), ("room", room), ("invigilator", invigilator),
+        ):
+            if obj is not None and (college_id is None or tenant_id_for(obj) != college_id):
+                errors[field_name] = "Select records that belong to the section's college."
         if section and subject and section.semester_id != subject.semester_id:
             errors["subject"] = "Exam subject must belong to the section's semester."
         if section and room:
@@ -451,9 +462,14 @@ class ExamScheduleSerializer(serializers.ModelSerializer):
                 errors["room"] = "A laboratory subject requires a laboratory room."
         if start is not None and duration is not None and start + duration - 1 > 8:
             errors["duration_periods"] = "The exam must finish within the academic day."
-        if date and start and duration:
+        if date and start and duration and college_id:
             proposed_periods = set(range(start, start + duration))
-            conflicts = ExamSchedule.objects.filter(date=date)
+            # Scope every conflict lookup to the section's college so another
+            # college's exams can never block this one or leak its existence.
+            conflicts = ExamSchedule.objects.filter(
+                date=date,
+                section__semester__course__department__college_id=college_id,
+            )
             if schedule:
                 conflicts = conflicts.exclude(pk=schedule.pk)
             conflicts = conflicts.filter(
@@ -473,6 +489,7 @@ class ExamScheduleSerializer(serializers.ModelSerializer):
                     timetable_conflicts = TimetableEntry.objects.filter(
                         weekday=date_weekday,
                         period__in=proposed_periods,
+                        section__semester__course__department__college_id=college_id,
                     ).filter(
                         models.Q(section=section)
                         | models.Q(room=room)
