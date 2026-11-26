@@ -47,7 +47,7 @@ jobs:
       - name: Migration drift
         run: python manage.py makemigrations --check --dry-run
       - name: Tests with coverage
-        run: coverage run manage.py test apps.accounts apps.operations && coverage report
+        run: coverage run manage.py test apps && coverage report
 
   frontend:
     runs-on: ubuntu-latest
