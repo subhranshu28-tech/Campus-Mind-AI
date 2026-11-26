@@ -90,6 +90,7 @@ urlpatterns = [
     path("api/student/portal/", StudentPortalView.as_view(), name="student_portal"),
     path("api/timetable/generate/", GenerateTimetableView.as_view(), name="generate_timetable"),
     path("api/", include("apps.operations.urls")),
+    path("api/", include("apps.notices.urls")),
     path("api/", include(router.urls)),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

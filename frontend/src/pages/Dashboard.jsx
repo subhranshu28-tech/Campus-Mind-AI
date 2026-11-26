@@ -30,12 +30,16 @@ const navigation = [
   { label: "Operations center", icon: Activity, module: "operations" },
   { label: "Subject notes", icon: FileText, module: "subject-notes" },
   { label: "Previous question papers", icon: ClipboardList, module: "question-papers" },
+  { label: "Notices", icon: Bell, module: "notices" },
+  { label: "Events", icon: CalendarDays, module: "events" },
   { label: "AI assistant", icon: Sparkles, module: "ai" },
 ];
 const studentNavigation = [
   { label: "My dashboard", icon: LayoutDashboard, module: "overview" },
   { label: "Subject notes", icon: FileText, module: "subject-notes" },
   { label: "Previous question papers", icon: ClipboardList, module: "question-papers" },
+  { label: "Notices", icon: Bell, module: "notices" },
+  { label: "Events", icon: CalendarDays, module: "events" },
 ];
 
 function Metric({ icon: Icon, label, value, note, color }) {

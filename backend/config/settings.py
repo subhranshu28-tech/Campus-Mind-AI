@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.campus",
     "apps.operations",
+    "apps.notices",
 ]
 if os.getenv("AWS_STORAGE_BUCKET_NAME"):
     INSTALLED_APPS.append("storages")

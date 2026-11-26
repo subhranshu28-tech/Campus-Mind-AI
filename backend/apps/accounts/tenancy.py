@@ -17,6 +17,8 @@ TENANT_LOOKUPS = {
     "FacultyLeave": "faculty__department__college_id",
     "Substitution": "section__semester__course__department__college_id",
     "AuditLog": "college_id",
+    "Notice": "college_id",
+    "CampusEvent": "college_id",
 }
 
 def scope_queryset(queryset, user):

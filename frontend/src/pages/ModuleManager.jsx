@@ -148,6 +148,28 @@ const modules = {
       { name: "duration_periods", label: "Duration (periods)", type: "number", min: 1, max: 8, defaultValue: 1, required: true },
     ],
   },
+  notices: {
+    endpoint: "notices", orderingField: "-published_at", columns: [["title", "Title"], ["audience", "Audience"], ["is_pinned", "Pinned"], ["published_at", "Published"], ["expires_at", "Expires"]],
+    fields: [
+      { name: "title", label: "Title", required: true },
+      { name: "body", label: "Body", type: "textarea", required: true },
+      { name: "audience", label: "Audience", type: "select", options: [["all", "Everyone"], ["students", "Students"], ["faculty", "Faculty"], ["managers", "Managers"]], defaultValue: "all", required: true },
+      { name: "is_pinned", label: "Pinned", type: "checkbox", defaultValue: false },
+      { name: "published_at", label: "Publish at", type: "datetime", required: true },
+      { name: "expires_at", label: "Expires at", type: "datetime", optional: true },
+    ],
+  },
+  events: {
+    endpoint: "events", orderingField: "starts_at", columns: [["title", "Title"], ["location", "Location"], ["audience", "Audience"], ["starts_at", "Starts"], ["ends_at", "Ends"]],
+    fields: [
+      { name: "title", label: "Title", required: true },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "location", label: "Location" },
+      { name: "audience", label: "Audience", type: "select", options: [["all", "Everyone"], ["students", "Students"], ["faculty", "Faculty"], ["managers", "Managers"]], defaultValue: "all", required: true },
+      { name: "starts_at", label: "Starts", type: "datetime", required: true },
+      { name: "ends_at", label: "Ends", type: "datetime", required: true },
+    ],
+  },
 };
 
 function getValue(object, path) {
@@ -170,6 +192,7 @@ function makeInitial(fields, record) {
     let value = record ? getValue(record, field.name) : field.defaultValue;
     if (field.type === "checkbox") value = Boolean(value);
     if (field.type === "date" && value) value = value.slice(0, 10);
+    if (field.type === "datetime" && value) value = String(value).slice(0, 16);
     if (field.name === "user.password" && record) value = "";
     if (value !== undefined && value !== null) setValue(values, field.name, value);
   }
@@ -338,6 +361,8 @@ export default function ModuleManager({ moduleKey, canManage }) {
                 const options = related[field.endpoint] || [];
                 return <label key={field.name} htmlFor={inputId} className="block text-sm font-medium text-slate-700">{field.label}<select id={inputId} required={required} value={value ?? ""} onChange={(event) => updateField(field, event.target.value)} className="field mt-1.5" disabled={options.length === 0}><option value="">{field.optional ? "None" : "Select…"}</option>{options.map((option) => <option key={option.id} value={field.optionValue ? getValue(option, field.optionValue) : option.id}>{option[field.optionLabel] || option.name || option.code || option.id}{field.endpoint === "sections" ? ` · ${option.name}` : ""}{field.endpoint === "semesters" ? ` · Semester ${option.number}` : ""}</option>)}</select></label>;
               }
+              if (field.type === "textarea") return <label key={field.name} htmlFor={inputId} className="block text-sm font-medium text-slate-700 lg:col-span-2">{field.label}<textarea id={inputId} required={required} disabled={disabled} value={value ?? ""} onChange={(event) => updateField(field, event.target.value)} placeholder={field.placeholder || ""} className="field mt-1.5 min-h-24 disabled:bg-slate-50 disabled:text-slate-400" /></label>;
+              if (field.type === "datetime") return <label key={field.name} htmlFor={inputId} className="block text-sm font-medium text-slate-700">{field.label}<input id={inputId} type="datetime-local" required={required} disabled={disabled} value={value ?? ""} onChange={(event) => updateField(field, event.target.value)} className="field mt-1.5 disabled:bg-slate-50 disabled:text-slate-400" /></label>;
               return <label key={field.name} htmlFor={inputId} className="block text-sm font-medium text-slate-700">{field.label}<input id={inputId} type={field.type || "text"} required={required} min={field.min} max={field.max} step={field.type === "number" ? "1" : undefined} disabled={disabled} value={value ?? ""} onChange={(event) => updateField(field, event.target.value)} placeholder={field.placeholder || ""} className="field mt-1.5 disabled:bg-slate-50 disabled:text-slate-400" /></label>;
             })}
           </div>
