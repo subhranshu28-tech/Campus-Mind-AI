@@ -219,7 +219,7 @@ The timetable model is **Monday–Friday, eight periods per day**; exam sessions
 # Backend — full suite (136 tests)
 python manage.py test apps
 
-# Frontend — unit/component tests (23 tests)
+# Frontend — unit/component tests (28 tests)
 cd frontend && npm test
 
 # Frontend production build + dependency audit
