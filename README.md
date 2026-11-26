@@ -13,6 +13,20 @@ CampusMind AI replaces scattered spreadsheets and manual coordination with a sin
 
 ---
 
+## Live demo
+
+| Target | URL |
+| --- | --- |
+| Web app (Vercel) | <https://frontend-roan-beta-41.vercel.app> |
+| Web app (Render) | <https://smart-campus-erp-frontend.onrender.com> |
+| API | <https://smart-campus-erp-api.onrender.com> |
+| API docs (Swagger) | <https://smart-campus-erp-api.onrender.com/api/docs/> |
+| Health check | <https://smart-campus-erp-api.onrender.com/healthz/> |
+
+The demo runs on free plans. The API sleeps after about 15 minutes of inactivity, so the first request after idle can take 30–60 seconds. Free PostgreSQL instances are temporary — use a paid, persistent database for real data.
+
+---
+
 ## Why CampusMind AI
 
 | Problem | How CampusMind addresses it |
@@ -196,7 +210,7 @@ Interactive docs are available at **`/api/docs/`** (Swagger) and **`/api/redoc/`
 | Transport | `/api/transport-routes/`, `/api/vehicles/`, `/api/student-transport/` |
 | Placements | `/api/companies/`, `/api/job-postings/`, `/api/placement-applications/` |
 
-All list endpoints support pagination, search, ordering, and filters. Campus administrators and HODs can manage records; faculty can read; students are limited to their own portal and assigned resources.
+All list endpoints support pagination, search, ordering, and filters. Campus administrators can manage every record in their college; HODs can manage records in their own department; faculty can read; students are limited to their own portal and assigned resources. Duplicate college-scoped names and codes (departments, academic years, classrooms, and ERP records) are rejected with a `400` and a field-level message.
 
 ---
 
@@ -209,14 +223,14 @@ All list endpoints support pagination, search, ordering, and filters. Campus adm
 5. Generate the timetable. CP-SAT assigns each weekly lesson to a weekday, period, and eligible room while avoiding section/faculty/room collisions and preserving other semesters.
 6. Review substitution suggestions, move classes with live conflict checks, and plan exams with clash detection.
 
-The timetable model is **Monday–Friday, eight periods per day**; exam sessions use the same day. The optimizer is a constraint solver, not a generative model — every assignment is an inspectable database record.
+The timetable defaults to **Monday–Friday, eight periods per day**, and both are configurable per college (period times too). Exam sessions use the same working days. The optimizer is a constraint solver, not a generative model — every assignment is an inspectable database record.
 
 ---
 
 ## Testing
 
 ```bash
-# Backend — full suite (136 tests)
+# Backend — full suite (141 tests)
 python manage.py test apps
 
 # Frontend — unit/component tests (28 tests)
@@ -227,7 +241,7 @@ npm run build
 npm audit --audit-level=high
 ```
 
-Backend coverage includes authentication and token revocation, tenant isolation, audit-chain verification, academic and attendance workflows, OR-Tools scheduling, asynchronous job lifecycle, substitutions, exam planning, analytics/export, notices, every ERP module (assignments, fees, library, hostel, transport, placements) including cross-tenant write rejection and student row scoping, and student self-service for assignment submissions and job applications. Frontend tests cover the API auth/refresh interceptors, login, the notification bell, module CRUD flows, pagination, and the error boundary.
+Backend coverage includes authentication and token revocation, tenant isolation, audit-chain verification, academic and attendance workflows, OR-Tools scheduling, asynchronous job lifecycle, substitutions, exam planning, analytics/export, notices, every ERP module (assignments, fees, library, hostel, transport, placements) including cross-tenant write rejection and student row scoping, duplicate college-scoped record validation (`400` instead of an integrity error), and student self-service for assignment submissions and job applications. Frontend tests cover the API auth/refresh interceptors, login, the notification bell, module CRUD flows, pagination, the error boundary, and the student self-service portal.
 
 CI runs on every push and pull request: critical lint, `check --deploy`, migration drift, the full backend suite with coverage, frontend tests, a production build, and `npm audit`.
 
@@ -259,7 +273,7 @@ Before opening public registration, rehearse the tenant migration on staging and
 | `EMAIL_*`, `DEFAULT_FROM_EMAIL`, `PASSWORD_RESET_URL` | Password reset and notice email |
 | `AWS_*` | Optional S3-compatible persistent media |
 | `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL` | Optional server-side LLM assistant |
-| `TIMETABLE_ASYNC_EAGER` | Run timetable generation inline instead of on a worker thread |
+| `TIMETABLE_ASYNC_EAGER` | Run timetable generation inline instead of dispatching to Celery (also used when `REDIS_URL` is unset) |
 
 Additional protections: JWT refresh rotation with blacklisting, CSP and hardening headers, HSTS/secure cookies in production, scoped throttling, and a tamper-evident audit log. See [SECURITY.md](SECURITY.md) for the deployment checklist and vulnerability reporting.
 
@@ -267,12 +281,12 @@ Additional protections: JWT refresh rotation with blacklisting, CSP and hardenin
 
 ## Deployment
 
-- **Docker Compose** — PostgreSQL, Redis, Django, nginx/React.
+- **Docker Compose** — PostgreSQL, Redis, Django, Celery worker, nginx/React.
 - **Render Blueprint** (`render.yaml`) — React static site, Django API, and PostgreSQL.
-- **Vercel** — builds and serves the React SPA only.
-- **Vercel + Render split** — host the API (and the long-running OR-Tools solver) on Render/Railway/Fly with persistent PostgreSQL and object storage, and keep Vercel for the frontend.
+- **Vercel** — builds and serves the React SPA; set `VITE_API_HOST` to the API hostname.
+- **Vercel + Render split** — the deployed topology: React on Vercel, Django API and PostgreSQL on Render, with a Celery worker when Redis is available.
 
-> The Render Blueprint is included but **has not been deployed or verified** in this repository. Free plans can sleep, expire, and lose ephemeral files; use paid/persistent services for real data.
+> The Render + Vercel split is **deployed and verified**: health, JWT auth, academic graph, timetable generation and export, analytics, ERP modules, and student self-service all passed a live smoke test. Keep `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, and `PUBLIC_FRONTEND_HOST` in sync with every frontend host. Free plans can sleep, expire, and lose ephemeral files; use paid/persistent services for real data.
 
 ---
 
@@ -308,10 +322,10 @@ Campus-Mind-AI/
 - ✅ Scheduling, academics, attendance, exams, leaves/substitutions, analytics, notices, assignments, fees, library, hostel, transport, placements.
 - ✅ Multi-college tenancy, audit hash chain, email notices, background timetable jobs.
 - ✅ Green CI with backend and frontend tests.
-- ⏳ Live deployment verification (Render/Vercel credentials required).
-- ✅ Durable job queue (Celery/RQ) for multi-worker deployments.
-- ⏳ Fine-grained department-level object policies.
-- ✅ Configurable period structures (currently Mon–Fri, 8 periods).
+- ✅ Live deployment verified on Render (API + PostgreSQL) and Vercel (frontend).
+- ✅ Durable job queue (Celery/RQ) for multi-worker deployments, with inline fallback.
+- ✅ Fine-grained department-level object policies (HODs scoped to their own department).
+- ✅ Configurable period structures (per-college weekdays and periods).
 
 ---
 
