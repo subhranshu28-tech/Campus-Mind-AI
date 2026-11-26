@@ -14,6 +14,7 @@ TENANT_LOOKUPS = {
     "FacultyAvailability": "faculty__department__college_id",
     "TimetableEntry": "section__semester__course__department__college_id",
     "ExamSchedule": "section__semester__course__department__college_id",
+    "TimetableJob": "college_id",
     "FacultyLeave": "faculty__department__college_id",
     "Substitution": "section__semester__course__department__college_id",
     "AuditLog": "college_id",

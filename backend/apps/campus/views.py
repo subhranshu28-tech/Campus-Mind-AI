@@ -3,7 +3,7 @@ from django.db.models import Count, Sum
 from django.db.models.deletion import ProtectedError
 from django.http import FileResponse
 from django.utils import timezone
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -28,6 +28,7 @@ from .models import (
     Subject,
     TeachingAssignment,
     TimetableEntry,
+    TimetableJob,
     SubjectNote,
     PreviousYearQuestionPaper,
 )
@@ -56,6 +57,7 @@ from .serializers import (
     TeachingAssignmentSerializer,
     TimetableEntrySerializer,
     TimetableGenerationResponseSerializer,
+    TimetableJobSerializer,
     SubjectNoteSerializer,
     PreviousYearQuestionPaperSerializer,
 )
@@ -64,6 +66,7 @@ from .timetable_optimizer import (
     _faculty_open_slots,
     generate_timetable,
 )
+from .jobs import enqueue_timetable_job
 
 
 class CampusModelViewSet(viewsets.ModelViewSet):
@@ -494,6 +497,35 @@ class GenerateTimetableView(APIView):
             "entry_count": len(entries),
             "entries": TimetableEntrySerializer(saved, many=True).data,
         })
+
+
+class AsyncGenerateTimetableView(APIView):
+    """Queue timetable generation and return a job to poll."""
+
+    permission_classes = [IsAuthenticated, CampusStaffCanManage]
+
+    @extend_schema(request=GenerateTimetableSerializer, responses=TimetableJobSerializer)
+    def post(self, request):
+        serializer = GenerateTimetableSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        semester = serializer.validated_data["semester"]
+        if semester.course.department.college_id != request.user.college_id:
+            raise ValidationError({"semester": "Semester must belong to your college."})
+        job = enqueue_timetable_job(semester, request.user)
+        return Response(TimetableJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
+
+
+class TimetableJobDetailView(APIView):
+    """Poll the status of a queued timetable-generation job."""
+
+    permission_classes = [IsAuthenticated, CampusStaffCanManage]
+
+    @extend_schema(responses=TimetableJobSerializer)
+    def get(self, request, pk):
+        job = scope_queryset(TimetableJob.objects.select_related("semester"), request.user).filter(pk=pk).first()
+        if job is None:
+            raise NotFound("Timetable job not found.")
+        return Response(TimetableJobSerializer(job).data)
 
 
 class DashboardSummaryView(APIView):

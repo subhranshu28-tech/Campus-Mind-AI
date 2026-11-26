@@ -376,3 +376,41 @@ class PreviousYearQuestionPaper(models.Model):
 
     def __str__(self):
         return f"{self.subject.code} · {self.exam_year} · {self.title}"
+
+
+class TimetableJob(models.Model):
+    """Tracks a background timetable-generation run.
+
+    The solver can take a long time on real college data, so generation is
+    queued as a job and polled by the UI instead of blocking the request.
+    """
+
+    STATUS_CHOICES = [
+        ("queued", "Queued"),
+        ("running", "Running"),
+        ("succeeded", "Succeeded"),
+        ("failed", "Failed"),
+    ]
+
+    college = models.ForeignKey("accounts.College", on_delete=models.CASCADE, related_name="timetable_jobs")
+    semester = models.ForeignKey(Semester, on_delete=models.CASCADE, related_name="timetable_jobs")
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="queued")
+    entry_count = models.PositiveIntegerField(default=0)
+    error = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["college", "status"], name="tjob_college_status_idx")]
+
+    def __str__(self):
+        return f"Timetable job {self.pk} · {self.semester} · {self.status}"

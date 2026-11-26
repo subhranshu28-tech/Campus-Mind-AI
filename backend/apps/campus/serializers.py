@@ -24,6 +24,7 @@ from .models import (
     PreviousYearQuestionPaper,
     TeachingAssignment,
     TimetableEntry,
+    TimetableJob,
 )
 
 User = get_user_model()
@@ -532,6 +533,28 @@ class TimetableGenerationResponseSerializer(serializers.Serializer):
     semester_label = serializers.CharField()
     entry_count = serializers.IntegerField()
     entries = TimetableEntrySerializer(many=True)
+
+
+class TimetableJobSerializer(serializers.ModelSerializer):
+    semester_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimetableJob
+        fields = (
+            "id",
+            "status",
+            "semester",
+            "semester_label",
+            "entry_count",
+            "error",
+            "created_at",
+            "started_at",
+            "finished_at",
+        )
+        read_only_fields = fields
+
+    def get_semester_label(self, obj):
+        return str(obj.semester)
 
 
 class FacultySubstituteSerializer(serializers.Serializer):

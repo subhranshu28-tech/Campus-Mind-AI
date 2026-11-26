@@ -149,6 +149,11 @@ if os.getenv("AWS_STORAGE_BUCKET_NAME"):
         MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Timetable optimisation runs on a background thread by default so large
+# solves do not block the request. Tests and tiny single-process installs can
+# force it to run inline with DJANGO_TIMETABLE_ASYNC_EAGER=true.
+TIMETABLE_ASYNC_EAGER = env_bool("TIMETABLE_ASYNC_EAGER", False)
+
 # Shared cache for DRF throttling and short-lived app data. Without REDIS_URL
 # each Gunicorn worker keeps its own counters, so limits are per-process.
 REDIS_URL = os.getenv("REDIS_URL", "").strip()
