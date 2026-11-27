@@ -1,17 +1,14 @@
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from apps.accounts.viewsets import TenantModelViewSet
 
 from .models import Assignment, Submission
-from .serializers import (
-    AssignmentSerializer,
-    StudentSubmissionSerializer,
-    SubmissionSerializer,
-)
+from .serializers import AssignmentSerializer, StudentSubmissionSerializer, SubmissionSerializer
 
 
 class AssignmentViewSet(TenantModelViewSet):
-    queryset = Assignment.objects.select_related("subject", "section", "faculty")
+    queryset = Assignment.objects.select_related("subject", "section", "faculty__user")
     serializer_class = AssignmentSerializer
     write_roles = {"super_admin", "college_admin", "hod", "faculty"}
     student_scope_field = "section_id"
@@ -22,7 +19,7 @@ class AssignmentViewSet(TenantModelViewSet):
 
 
 class SubmissionViewSet(TenantModelViewSet):
-    queryset = Submission.objects.select_related("assignment", "student")
+    queryset = Submission.objects.select_related("assignment", "student__user")
     serializer_class = SubmissionSerializer
     write_roles = {"super_admin", "college_admin", "hod", "faculty"}
     student_scope_field = "student_id"
@@ -43,21 +40,23 @@ class SubmissionViewSet(TenantModelViewSet):
             if assignment is None:
                 raise ValidationError({"assignment": "This field is required."})
             if assignment.college_id != getattr(user, "college_id", None):
-                raise ValidationError(
-                    {"assignment": "Related records must belong to your college."}
-                )
+                raise ValidationError({"assignment": "Related records must belong to your college."})
             if assignment.section_id != student.section_id:
-                raise ValidationError(
-                    {"assignment": "You can only submit assignments for your section."}
-                )
-            if Submission.objects.filter(
-                assignment=assignment, student=student
-            ).exists():
-                raise ValidationError(
-                    {"detail": "You have already submitted this assignment."}
-                )
+                raise ValidationError({"assignment": "You can only submit assignments for your section."})
+            if Submission.objects.filter(assignment=assignment, student=student).exists():
+                raise ValidationError({"detail": "You have already submitted this assignment."})
             serializer.save(student=student)
         else:
             if "student" not in serializer.validated_data:
                 raise ValidationError({"student": "This field is required."})
             super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        old_marks = serializer.instance.marks
+        super().perform_update(serializer)
+        instance = serializer.instance
+        if instance.marks != old_marks or (instance.marks is not None and instance.graded_at is None):
+            if instance.marks is not None:
+                instance.graded_by = self.request.user
+                instance.graded_at = timezone.now()
+                instance.save(update_fields=["graded_by", "graded_at"])

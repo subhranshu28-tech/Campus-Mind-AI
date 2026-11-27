@@ -17,6 +17,11 @@ class AssignmentSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("college", "created_by", "created_at")
 
+    def validate_max_marks(self, value):
+        if value < 1:
+            raise serializers.ValidationError("Max marks must be at least 1.")
+        return value
+
 
 class SubmissionSerializer(serializers.ModelSerializer):
     assignment_title = serializers.CharField(source="assignment.title", read_only=True)
@@ -30,22 +35,25 @@ class SubmissionSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("submitted_at", "graded_by", "graded_at")
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        assignment = attrs.get("assignment", getattr(instance, "assignment", None))
+        marks = attrs.get("marks", getattr(instance, "marks", None))
+        if marks is not None:
+            if marks < 0:
+                raise serializers.ValidationError({"marks": "Marks cannot be negative."})
+            if assignment and marks > assignment.max_marks:
+                raise serializers.ValidationError({"marks": "Marks cannot exceed max marks."})
+        return attrs
+
 
 class StudentSubmissionSerializer(serializers.ModelSerializer):
-    """Self-service serializer for students: grading fields are read-only."""
-
     assignment_title = serializers.CharField(source="assignment.title", read_only=True)
 
     class Meta:
         model = Submission
         fields = (
-            "id",
-            "assignment",
-            "assignment_title",
-            "file",
-            "submitted_at",
-            "marks",
-            "feedback",
-            "graded_at",
+            "id", "assignment", "assignment_title", "file", "submitted_at", "marks", "feedback", "graded_at",
         )
         read_only_fields = ("id", "submitted_at", "marks", "feedback", "graded_at")

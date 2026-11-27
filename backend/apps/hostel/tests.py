@@ -89,7 +89,7 @@ class HostelAllocationApiTests(ERPAPITestCase):
         self.assertEqual(response.status_code, 400, response.data)
         self.assertFalse(HostelAllocation.objects.exists())
 
-    def test_staff_can_allocate_a_room(self):
+    def test_staff_can_allocate_a_room_and_updates_occupancy(self):
         response = self.client.post(
             "/api/hostel-allocations/",
             {"student": self.campus.student.id, "room": self.room.id},
@@ -97,6 +97,8 @@ class HostelAllocationApiTests(ERPAPITestCase):
         )
 
         self.assertEqual(response.status_code, 201, response.data)
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.occupied, 1)
 
     def test_student_only_sees_their_own_allocation(self):
         mine = self.allocate(self.room, self.campus.student)

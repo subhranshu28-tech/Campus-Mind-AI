@@ -55,15 +55,15 @@ class VehicleApiTests(ERPAPITestCase):
         self.assertEqual(response.status_code, 400, response.data)
         self.assertFalse(Vehicle.objects.exists())
 
-    def test_vehicle_can_be_created_without_a_route(self):
+    def test_vehicle_requires_a_route(self):
         response = self.client.post(
             "/api/vehicles/",
             {"registration_number": "OD-02-AB-5678", "capacity": 32},
             format="json",
         )
 
-        self.assertEqual(response.status_code, 201, response.data)
-        self.assertIsNone(Vehicle.objects.get(pk=response.data["id"]).route_id)
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(Vehicle.objects.exists())
 
     def test_list_is_scoped_through_the_route(self):
         mine = TransportRoute.objects.create(college=self.college, name="Route 1")

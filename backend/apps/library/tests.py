@@ -79,7 +79,7 @@ class BookIssueApiTests(ERPAPITestCase):
         self.assertEqual(response.status_code, 400, response.data)
         self.assertFalse(BookIssue.objects.exists())
 
-    def test_staff_can_issue_a_book(self):
+    def test_staff_can_issue_a_book_and_available_copies_decrement(self):
         response = self.client.post(
             "/api/book-issues/",
             {
@@ -91,6 +91,8 @@ class BookIssueApiTests(ERPAPITestCase):
         )
 
         self.assertEqual(response.status_code, 201, response.data)
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.available_copies, 1)
 
     def test_list_is_scoped_to_the_college(self):
         mine = self.issue(self.book, self.campus.student)
@@ -127,3 +129,18 @@ class BookIssueApiTests(ERPAPITestCase):
 
         self.assertEqual(response.status_code, 403, response.data)
         self.assertFalse(BookIssue.objects.exists())
+
+    def test_returning_issue_restores_available_copy(self):
+        issue = self.issue(self.book, self.campus.student)
+        self.book.available_copies = 1
+        self.book.save(update_fields=["available_copies"])
+
+        response = self.client.patch(
+            f"/api/book-issues/{issue.id}/",
+            {"status": "returned", "returned_on": "2026-12-10"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.available_copies, 2)

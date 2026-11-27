@@ -149,6 +149,7 @@ const modules = {
     ],
   },
   notices: {
+    title: "Notices", description: "Publish campus notices to students, faculty, or everyone.",
     endpoint: "notices", orderingField: "-published_at", columns: [["title", "Title"], ["audience", "Audience"], ["is_pinned", "Pinned"], ["published_at", "Published"], ["expires_at", "Expires"]],
     fields: [
       { name: "title", label: "Title", required: true },
@@ -160,6 +161,7 @@ const modules = {
     ],
   },
   events: {
+    title: "Events", description: "Manage campus events and their audience.",
     endpoint: "events", orderingField: "starts_at", columns: [["title", "Title"], ["location", "Location"], ["audience", "Audience"], ["starts_at", "Starts"], ["ends_at", "Ends"]],
     fields: [
       { name: "title", label: "Title", required: true },
@@ -171,6 +173,7 @@ const modules = {
     ],
   },
   assignments: {
+    title: "Assignments", description: "Create and track course assignments by section.",
     endpoint: "assignments", orderingField: "-due_at", columns: [["title", "Title"], ["subject_name", "Subject"], ["section_name", "Section"], ["due_at", "Due"], ["max_marks", "Marks"]],
     fields: [
       { name: "title", label: "Title", required: true },
@@ -183,6 +186,7 @@ const modules = {
     ],
   },
   "fee-structures": {
+    title: "Fee structures", description: "Define fee heads and amounts for invoicing.",
     endpoint: "fee-structures", orderingField: "name", columns: [["name", "Fee structure"], ["amount", "Amount"], ["is_active", "Active"], ["created_at", "Created"]],
     fields: [
       { name: "name", label: "Name", required: true },
@@ -192,25 +196,28 @@ const modules = {
     ],
   },
   invoices: {
-    endpoint: "invoices", orderingField: "-created_at", columns: [["student_name", "Student"], ["fee_structure_name", "Fee"], ["amount", "Amount"], ["due_date", "Due"], ["status", "Status"]],
+    title: "Invoices", description: "Issue and track student fee invoices.",
+    endpoint: "invoices", orderingField: "-created_at", columns: [["student_name", "Student"], ["fee_structure_name", "Fee"], ["amount", "Amount"], ["balance", "Balance"], ["due_date", "Due"], ["status", "Status"]],
     fields: [
       { name: "student", label: "Student", type: "select", endpoint: "students", optionLabel: "student_id", required: true, numeric: true },
       { name: "fee_structure", label: "Fee structure", type: "select", endpoint: "fee-structures", optionLabel: "name", required: true, numeric: true },
-      { name: "amount", label: "Amount", type: "number", required: true },
+      { name: "amount", label: "Amount", type: "number", min: 0, required: true },
       { name: "due_date", label: "Due date", type: "date", required: true },
       { name: "status", label: "Status", type: "select", options: [["pending", "Pending"], ["paid", "Paid"], ["overdue", "Overdue"], ["cancelled", "Cancelled"]], defaultValue: "pending", required: true },
     ],
   },
   payments: {
+    title: "Payments", description: "Record invoice payments and references.",
     endpoint: "payments", orderingField: "-paid_on", columns: [["invoice_label", "Invoice"], ["amount", "Amount"], ["method", "Method"], ["reference", "Reference"], ["paid_on", "Paid"]],
     fields: [
-      { name: "invoice", label: "Invoice", type: "select", endpoint: "invoices", optionLabel: "student_name", required: true, numeric: true },
+      { name: "invoice", label: "Invoice", type: "select", endpoint: "invoices", optionLabel: "fee_structure_name", required: true, numeric: true },
       { name: "amount", label: "Amount", type: "number", min: 0, required: true },
       { name: "method", label: "Method", defaultValue: "cash", required: true },
       { name: "reference", label: "Reference" },
     ],
   },
   books: {
+    title: "Library books", description: "Maintain the library catalogue and copy counts.",
     endpoint: "books", orderingField: "title", columns: [["title", "Title"], ["author", "Author"], ["isbn", "ISBN"], ["available_copies", "Available"], ["total_copies", "Total"]],
     fields: [
       { name: "title", label: "Title", required: true },
@@ -221,6 +228,7 @@ const modules = {
     ],
   },
   "book-issues": {
+    title: "Book issues", description: "Issue books to students and track returns/fines.",
     endpoint: "book-issues", orderingField: "-issued_on", columns: [["book_title", "Book"], ["student_name", "Student"], ["issued_on", "Issued"], ["due_on", "Due"], ["status", "Status"], ["fine", "Fine"]],
     fields: [
       { name: "book", label: "Book", type: "select", endpoint: "books", optionLabel: "title", required: true, numeric: true },
@@ -232,6 +240,7 @@ const modules = {
     ],
   },
   hostels: {
+    title: "Hostels", description: "Manage hostel buildings and wardens.",
     endpoint: "hostels", orderingField: "name", columns: [["name", "Hostel"], ["gender", "Gender"], ["capacity", "Capacity"], ["warden", "Warden"]],
     fields: [
       { name: "name", label: "Name", required: true },
@@ -241,6 +250,7 @@ const modules = {
     ],
   },
   "hostel-rooms": {
+    title: "Hostel rooms", description: "Manage rooms and bed capacity per hostel.",
     endpoint: "hostel-rooms", orderingField: "room_number", columns: [["hostel_name", "Hostel"], ["room_number", "Room"], ["capacity", "Capacity"], ["occupied", "Occupied"]],
     fields: [
       { name: "hostel", label: "Hostel", type: "select", endpoint: "hostels", optionLabel: "name", required: true, numeric: true },
@@ -249,6 +259,7 @@ const modules = {
     ],
   },
   "hostel-allocations": {
+    title: "Hostel allocations", description: "Allocate students to hostel rooms.",
     endpoint: "hostel-allocations", orderingField: "-allocated_on", columns: [["student_name", "Student"], ["room_label", "Room"], ["allocated_on", "Allocated"], ["is_active", "Active"]],
     fields: [
       { name: "student", label: "Student", type: "select", endpoint: "students", optionLabel: "student_id", required: true, numeric: true },
@@ -257,6 +268,7 @@ const modules = {
     ],
   },
   "transport-routes": {
+    title: "Transport routes", description: "Define campus transport routes and fares.",
     endpoint: "transport-routes", orderingField: "name", columns: [["name", "Route"], ["origin", "Origin"], ["destination", "Destination"], ["fare", "Fare"]],
     fields: [
       { name: "name", label: "Name", required: true },
@@ -266,16 +278,18 @@ const modules = {
     ],
   },
   vehicles: {
+    title: "Vehicles", description: "Register transport vehicles and drivers.",
     endpoint: "vehicles", orderingField: "registration_number", columns: [["registration_number", "Registration"], ["route_name", "Route"], ["capacity", "Capacity"], ["driver_name", "Driver"]],
     fields: [
       { name: "registration_number", label: "Registration number", required: true },
-      { name: "route", label: "Route", type: "select", endpoint: "transport-routes", optionLabel: "name", optional: true, numeric: true },
+      { name: "route", label: "Route", type: "select", endpoint: "transport-routes", optionLabel: "name", required: true, numeric: true },
       { name: "capacity", label: "Capacity", type: "number", min: 0, defaultValue: 40 },
       { name: "driver_name", label: "Driver name" },
       { name: "driver_phone", label: "Driver phone" },
     ],
   },
   "student-transport": {
+    title: "Student transport", description: "Assign students to transport routes.",
     endpoint: "student-transport", orderingField: "-allocated_on", columns: [["student_name", "Student"], ["route_name", "Route"], ["pickup_point", "Pickup"], ["is_active", "Active"]],
     fields: [
       { name: "student", label: "Student", type: "select", endpoint: "students", optionLabel: "student_id", required: true, numeric: true },
@@ -285,6 +299,7 @@ const modules = {
     ],
   },
   companies: {
+    title: "Companies", description: "Manage placement companies and contacts.",
     endpoint: "companies", orderingField: "name", columns: [["name", "Company"], ["industry", "Industry"], ["website", "Website"], ["contact_person", "Contact"]],
     fields: [
       { name: "name", label: "Name", required: true },
@@ -295,6 +310,7 @@ const modules = {
     ],
   },
   "job-postings": {
+    title: "Job postings", description: "Publish placement job postings.",
     endpoint: "job-postings", orderingField: "-created_at", columns: [["title", "Role"], ["company_name", "Company"], ["package", "Package"], ["deadline", "Deadline"], ["is_active", "Active"]],
     fields: [
       { name: "company", label: "Company", type: "select", endpoint: "companies", optionLabel: "name", required: true, numeric: true },
@@ -307,6 +323,7 @@ const modules = {
     ],
   },
   "placement-applications": {
+    title: "Placement applications", description: "Track student placement applications.",
     endpoint: "placement-applications", orderingField: "-applied_on", columns: [["student_name", "Student"], ["job_title", "Job"], ["status", "Status"], ["applied_on", "Applied"]],
     fields: [
       { name: "student", label: "Student", type: "select", endpoint: "students", optionLabel: "student_id", required: true, numeric: true },
@@ -361,7 +378,8 @@ function getErrorMessage(error) {
 }
 
 export default function ModuleManager({ moduleKey, canManage }) {
-  const module = modules[moduleKey];
+  const module = modules[moduleKey] || { title: moduleKey, description: "", endpoint: moduleKey, fields: [], columns: [], filters: [] };
+  const missingModule = !modules[moduleKey];
   const [rows, setRows] = useState([]);
   const [related, setRelated] = useState({});
   const [search, setSearch] = useState("");
@@ -470,7 +488,7 @@ export default function ModuleManager({ moduleKey, canManage }) {
   }
 
   async function remove(record) {
-    if (!window.confirm(`Delete this ${module.title.toLowerCase()} record? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete this ${(module.title || moduleKey).toLowerCase()} record? This cannot be undone.`)) return;
     setError("");
     try {
       await api.delete(`/${module.endpoint}/${record.id}/`);
@@ -482,16 +500,17 @@ export default function ModuleManager({ moduleKey, canManage }) {
 
   return (
     <section className="content-enter">
+      {missingModule && <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">This section (<strong>{moduleKey}</strong>) is not configured in the UI. Please refresh or contact your administrator.</div>}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div><p className="text-sm font-medium text-blue-700">Campus records</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">{module.title}</h1><p className="mt-1 text-sm text-slate-500">{module.description}</p></div>
-        {canManage && <button onClick={beginCreate} className="glass-button inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"><Plus size={16} />Add {module.title.replace(/s$/, "")}</button>}
+        <div><p className="text-sm font-medium text-blue-700">Campus records</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">{module.title || moduleKey}</h1><p className="mt-1 text-sm text-slate-500">{module.description || ""}</p></div>
+        {canManage && <button onClick={beginCreate} className="glass-button inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"><Plus size={16} />Add {(module.title || moduleKey).replace(/s$/, "")}</button>}
       </div>
 
       {error && <div role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError("")}><X size={16} /></button></div>}
 
       {formOpen && (
         <form onSubmit={submit} className="panel mb-5">
-          <div className="mb-5 flex items-center justify-between"><div><h2 className="font-semibold">{editing ? `Edit ${module.title.replace(/s$/, "")}` : `Add ${module.title.replace(/s$/, "")}`}</h2><p className="mt-1 text-xs text-slate-500">Fields marked required must be completed.</p></div><button type="button" aria-label="Close form" onClick={() => { setEditing(null); setForm({}); setFormOpen(false); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={17} /></button></div>
+          <div className="mb-5 flex items-center justify-between"><div><h2 className="font-semibold">{editing ? `Edit ${(module.title || moduleKey).replace(/s$/, "")}` : `Add ${(module.title || moduleKey).replace(/s$/, "")}`}</h2><p className="mt-1 text-xs text-slate-500">Fields marked required must be completed.</p></div><button type="button" aria-label="Close form" onClick={() => { setEditing(null); setForm({}); setFormOpen(false); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={17} /></button></div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {module.fields.map((field) => {
               const value = getValue(form, field.name);
@@ -518,8 +537,8 @@ export default function ModuleManager({ moduleKey, canManage }) {
 
       <div className="panel !p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
-          <div className="relative min-w-[220px] flex-1 sm:max-w-sm"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder={`Search ${module.title.toLowerCase()}…`} /></div>
-          <div className="flex flex-wrap items-center gap-2">{(module.filters || []).map((filter) => <select key={filter.name} aria-label={`Filter by ${filter.label}`} value={filters[filter.name] || ""} onChange={(event) => { setFilters((current) => ({ ...current, [filter.name]: event.target.value })); setPage(1); }} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-600 outline-none focus:border-blue-300"><option value="">All {filter.label.toLowerCase()}</option>{filter.options ? filter.options.map(([value, label]) => <option key={value} value={value}>{label}</option>) : (related[filter.endpoint] || []).map((option) => <option key={option.id} value={option.id}>{option[filter.optionLabel] || option.name}</option>)}</select>)}<button onClick={() => setOrdering((value) => value ? "" : `-${module.orderingField}`)} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"><ArrowDownUp size={14} />{ordering ? "Descending" : "Sort"}</button></div>
+          <div className="relative min-w-[220px] flex-1 sm:max-w-sm"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder={`Search ${(module.title || moduleKey).toLowerCase()}…`} /></div>
+          <div className="flex flex-wrap items-center gap-2">{(module.filters || []).map((filter) => <select key={filter.name} aria-label={`Filter by ${filter.label}`} value={filters[filter.name] || ""} onChange={(event) => { setFilters((current) => ({ ...current, [filter.name]: event.target.value })); setPage(1); }} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-600 outline-none focus:border-blue-300"><option value="">All {(filter.label || "").toLowerCase()}</option>{filter.options ? filter.options.map(([value, label]) => <option key={value} value={value}>{label}</option>) : (related[filter.endpoint] || []).map((option) => <option key={option.id} value={option.id}>{option[filter.optionLabel] || option.name}</option>)}</select>)}<button onClick={() => setOrdering((value) => value ? "" : `-${module.orderingField}`)} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"><ArrowDownUp size={14} />{ordering ? "Descending" : "Sort"}</button></div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-left text-sm">

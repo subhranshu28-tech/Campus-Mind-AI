@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.serializers import TenantScopedUniqueNameMixin
@@ -21,6 +22,10 @@ class JobPostingSerializer(serializers.ModelSerializer):
             "id", "company", "company_name", "title", "description", "eligibility",
             "package", "deadline", "is_active", "created_at",
         )
+        read_only_fields = ("created_at",)
+
+    def validate_deadline(self, value):
+        return value
 
 
 class PlacementApplicationSerializer(serializers.ModelSerializer):
@@ -37,8 +42,6 @@ class PlacementApplicationSerializer(serializers.ModelSerializer):
 
 
 class StudentPlacementApplicationSerializer(serializers.ModelSerializer):
-    """Self-service serializer: students cannot choose their own status."""
-
     job_title = serializers.CharField(source="job.title", read_only=True)
     company_name = serializers.CharField(source="job.company.name", read_only=True)
 

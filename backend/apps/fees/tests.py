@@ -174,7 +174,7 @@ class PaymentApiTests(ERPAPITestCase):
             status="pending",
         )
 
-    def test_create_records_the_acting_user(self):
+    def test_create_records_the_acting_user_and_updates_invoice(self):
         response = self.client.post(
             "/api/payments/",
             {
@@ -189,7 +189,31 @@ class PaymentApiTests(ERPAPITestCase):
         self.assertEqual(response.status_code, 201, response.data)
         payment = Payment.objects.get(pk=response.data["id"])
         self.assertEqual(payment.recorded_by, self.admin)
-        self.assertEqual(payment.amount, 20000)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, "pending")
+        self.assertIsNone(self.invoice.paid_at)
+
+    def test_full_payment_marks_invoice_paid(self):
+        response = self.client.post(
+            "/api/payments/",
+            {"invoice": self.invoice.id, "amount": "45000.00", "method": "cash"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, "paid")
+        self.assertIsNotNone(self.invoice.paid_at)
+
+    def test_overpayment_is_rejected(self):
+        Payment.objects.create(invoice=self.invoice, amount="30000.00")
+        response = self.client.post(
+            "/api/payments/",
+            {"invoice": self.invoice.id, "amount": "20000.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400, response.data)
 
     def test_create_rejects_invoice_from_another_college(self):
         other_fee = FeeStructure.objects.create(
